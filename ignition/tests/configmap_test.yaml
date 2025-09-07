@@ -1,0 +1,94 @@
+suite: ConfigMap Tests
+release:
+  name: ignition
+  namespace: ignition-test
+templates:
+- configmap.yaml
+tests:
+- it: Validate ConfigMap Count
+  asserts:
+  - hasDocuments:
+      count: 3
+- it: Validate base ConfigMap Creation
+  documentIndex: 0
+  asserts:
+  - containsDocument:
+      kind: ConfigMap
+      apiVersion: v1
+      name: ignition-config-base
+- it: Validate files ConfigMap Creation
+  documentIndex: 1
+  asserts:
+  - containsDocument:
+      kind: ConfigMap
+      apiVersion: v1
+      name: ignition-config-files
+- it: Validate scripts ConfigMap Creation
+  documentIndex: 2
+  asserts:
+  - containsDocument:
+      kind: ConfigMap
+      apiVersion: v1
+      name: ignition-config-scripts
+# Content Tests
+- it: Validate commissioning env vars
+  documentSelector:
+    path: metadata.name
+    value: ignition-config-base
+  set:
+    commissioning:
+      edition: standard
+      acceptIgnitionEULA: true
+  asserts:
+  - isType:
+      path: data.ACCEPT_IGNITION_EULA
+      type: string
+  - equal:
+      path: data.ACCEPT_IGNITION_EULA
+      value: "Y"
+  - equal:
+      path: data.IGNITION_EDITION
+      value: "standard"
+- it: Validate base auth definitions
+  documentSelector:
+    path: metadata.name
+    value: ignition-config-base
+  asserts:
+  - equal:
+      path: data.GATEWAY_ADMIN_PASSWORD_FILE
+      value: "/run/secrets/ignition/gateway-admin-password"
+# Redundancy Checks for Script Inclusion
+- it: Validate Redundancy Script Inclusion
+  documentIndex: 2
+  set:
+    gateway.redundancy.enabled: true
+  asserts:
+  - exists:
+      path: data["redundant-health-check.sh"]
+  - exists:
+      path: data["prepare-redundancy.sh"]
+# Evaluate Gateway Network Security Policy
+- it: Validate Whitelist excluded when Security Policy is default (ApprovedOnly)
+  documentIndex: 0
+  set:
+    gateway.gan.whitelist:
+      - ignition-backup
+  asserts:
+  - notExists:  # default determined by Ignition
+      path: data.GATEWAY_NETWORK_SECURITYPOLICY
+  - notExists:
+      path: data.GATEWAY_NETWORK_WHITELIST
+- it: Validate Whitelist included when Security Policy is SpecifiedList
+  documentIndex: 0
+  set:
+    gateway.gan.securityPolicy: SpecifiedList
+    gateway.gan.whitelist:
+    - ignition-primary
+    - ignition-backup
+  asserts:
+  - equal:
+      path: data.GATEWAY_NETWORK_SECURITYPOLICY
+      value: "SpecifiedList"
+  - equal:
+      path: data.GATEWAY_NETWORK_WHITELIST
+      value: "ignition-primary,ignition-backup"

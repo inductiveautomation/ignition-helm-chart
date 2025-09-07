@@ -1,0 +1,239 @@
+suite: StatefulSet Tests
+release:
+  name: ignition
+  namespace: ignition-test
+templates:
+- statefulset.yaml
+- configmap.yaml
+tests:
+# General tests for StatefulSet Structure
+- it: Renders StatefulSet
+  template: statefulset.yaml
+  asserts:
+  - containsDocument:
+      kind: StatefulSet
+      apiVersion: apps/v1
+      name: ignition-gateway
+# Security Context Tests
+- it: Validate Security Context
+  template: statefulset.yaml
+  asserts:
+  - isSubset:
+      path: spec.template.spec.securityContext
+      content:
+        runAsUser: 2003
+        runAsGroup: 2003
+        fsGroup: 2003
+        runAsNonRoot: true
+# Misc Tests
+- it: Validate Miscellaneous Settings
+  template: statefulset.yaml
+  asserts:
+  # Make sure that our config map is linked into the environment of the gateway container
+  - contains:
+      path: spec.template.spec.containers[0].envFrom
+      content:
+        configMapRef:
+          name: ignition-config-base
+  # Check that our expected volume mounts exist
+  - contains:
+      path: spec.template.spec.containers[0].volumeMounts
+      content:
+        mountPath: /config/scripts
+        name: config-scripts
+        readOnly: true
+  - contains:
+      path: spec.template.spec.containers[0].volumeMounts
+      content:
+        mountPath: /config/files
+        name: config-files
+        readOnly: true
+  - contains:
+      path: spec.template.spec.containers[0].volumeMounts
+      content:
+        mountPath: /run/secrets/ignition
+        name: secrets
+        readOnly: true
+  # Check that the associated volumes are defined
+  - contains:
+      path: spec.template.spec.volumes
+      content:
+        name: config-scripts
+        configMap:
+          name: ignition-config-scripts
+          defaultMode: 0755
+  - contains:
+      path: spec.template.spec.volumes
+      content:
+        name: config-files
+        configMap:
+          name: ignition-config-files
+          defaultMode: 0644
+# Verify StatefulSet naming
+- it: Validate StatefulSet name
+  template: statefulset.yaml
+  release:
+    name: ignition2
+  asserts:
+  - equal:
+      path: metadata.name
+      value: ignition2-gateway
+- it: Validate StatefulSet full name override
+  template: statefulset.yaml
+  set:
+    fullnameOverride: foo
+  release:
+    name: ignition2
+  asserts:
+  - equal:
+      path: metadata.name
+      value: foo-gateway
+- it: Validate StatefulSet name override
+  template: statefulset.yaml
+  set:
+    nameOverride: foo
+  asserts:
+  - equal:
+      path: metadata.name
+      value: ignition-foo-gateway
+# Verify Pod Labels are applied correctly
+- it: Validate Pod Base Labels
+  template: statefulset.yaml
+  chart:
+    version: "0.1.0"
+    appVersion: "8.3.0"
+  release:
+    name: ignition2
+  asserts:
+  - isSubset:
+      path: metadata.labels
+      content:
+        app.kubernetes.io/name: ignition
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/instance: ignition2
+        app.kubernetes.io/version: "8.3.0"
+        helm.sh/chart: ignition-0.1.0
+- it: Validate Pod with Custom Labels
+  template: statefulset.yaml
+  chart:
+    version: "0.1.0"
+    appVersion: "8.3.0"
+  set:
+    podLabels:
+      foo: bar
+      bar: baz
+    nameOverride: foo
+  asserts:
+  - isSubset:
+      path: metadata.labels
+      content:
+        app.kubernetes.io/name: foo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/instance: ignition
+        app.kubernetes.io/version: "8.3.0"
+        helm.sh/chart: ignition-0.1.0
+        foo: bar
+        bar: baz
+# Verify Pod AntiAffinity is applied correctly
+- it: Validate Pod AntiAffinity
+  template: statefulset.yaml
+  set:
+    podAntiAffinity: true
+  release:
+    name: ignition2
+  asserts:
+  - isSubset:
+      path: spec.template.spec.affinity
+      content:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                - ignition
+              - key: app.kubernetes.io/instance
+                operator: In
+                values:
+                - ignition2
+            topologyKey: kubernetes.io/hostname
+- it: Validate Custom Pod AntiAffinity with template directive
+  template: statefulset.yaml
+  set:
+    podAntiAffinity: false
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: ignition
+            topologyKey: kubernetes.io/hostname
+            namespaceSelector: {}
+        requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+              - '{{ include "ignition.name" . }}'
+            - key: app.kubernetes.io/instance
+              operator: In
+              values:
+              - '{{ .Release.Name }}'
+          topologyKey: kubernetes.io/hostname
+  asserts:
+  - isSubset:
+      path: spec.template.spec.affinity
+      content:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: ignition
+              topologyKey: kubernetes.io/hostname
+              namespaceSelector: {}
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                - 'ignition'
+              - key: app.kubernetes.io/instance
+                operator: In
+                values:
+                - 'ignition'
+            topologyKey: kubernetes.io/hostname
+- it: Validate specifying both Pod AntiAffinity and Affinity fails
+  template: statefulset.yaml
+  set:
+    podAntiAffinity: true
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution: []
+  asserts:
+  - failedTemplate:
+      errorMessage: "affinity cannot be specified with podAntiAffinity=true"
+# Validate Redundancy Preparation Script Inclusion
+- it: Validate Redundancy Preparation Script Inclusion
+  template: statefulset.yaml
+  set:
+    gateway.redundancy.enabled: true
+  asserts:
+  - contains:
+      path: spec.template.spec.initContainers[0].args
+      content: '/config/scripts/prepare-redundancy.sh -g "ignition-gateway-0.ignition" -v'
+- it: Validate Redundancy Preparation Script Inclusion with no TLS
+  template: statefulset.yaml
+  set:
+    gateway.redundancy.enabled: true
+    gateway.env.GATEWAY_NETWORK_REQUIRESSL: false
+  asserts:
+  - contains:
+      path: spec.template.spec.initContainers[0].args
+      content: '/config/scripts/prepare-redundancy.sh -g "ignition-gateway-0.ignition" -k -v'

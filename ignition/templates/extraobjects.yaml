@@ -1,0 +1,4 @@
+{{- range .Values.extraObjects -}}
+---
+{{- include "ignition.rinseThroughTpl" (dict "context" $ "content" .) }}
+{{- end -}}

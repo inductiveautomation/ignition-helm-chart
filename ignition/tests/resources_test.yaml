@@ -1,0 +1,82 @@
+x-default-resources: &default-resources
+  requests:
+    cpu: 1000m
+    memory: 1536Mi
+  limits:
+    cpu: 1000m
+    memory: 1536Mi
+x-custom-resources: &custom-resources
+  requests:
+    cpu: 2000m
+    memory: 2048Mi
+  limits:
+    cpu: 2000m
+    memory: 2048Mi
+
+suite: Resources Tests
+release:
+  name: ignition
+  namespace: ignition-test
+templates:
+- statefulset.yaml
+- configmap.yaml
+tests:
+# Resource setting tests
+- it: Validate Default Resources
+  template: statefulset.yaml
+  asserts:
+  - isSubset:
+      path: spec.template.spec.containers[0].resources
+      content: *default-resources
+  - isSubset:
+      path: spec.template.spec.initContainers[0].resources
+      content: *default-resources
+- it: Validate Resources Disabled
+  template: statefulset.yaml
+  set:
+    gateway.resourcesEnabled: false
+    gateway.resources: *custom-resources
+  asserts:
+  - notExists:
+      path: spec.template.spec.containers[0].resources
+  - notExists:
+      path: spec.template.spec.initContainers[0].resources
+- it: Validate Custom Resources
+  template: statefulset.yaml
+  set:
+    gateway.resourcesEnabled: true
+    gateway.resources: *custom-resources
+  asserts:
+  - isSubset:
+      path: spec.template.spec.containers[0].resources
+      content: *custom-resources
+  - isSubset:
+      path: spec.template.spec.initContainers[0].resources
+      content: *custom-resources
+- it: Validate Custom Memory Percentage
+  template: statefulset.yaml
+  set:
+    gateway.maxRAMPercentage: 50
+  asserts:
+  # Currently, when redundancy is disabled, the `--` delimiter ends up at index 8
+  # We need to make sure that the wrapper/jvm args follow this delimiter
+  - equal:
+      path: spec.template.spec.containers[0].args[8]
+      value: --
+  - equal:
+      path: spec.template.spec.containers[0].args[9]
+      value: wrapper.java.initmemory=0
+  - equal:
+      path: spec.template.spec.containers[0].args[10]
+      value: wrapper.java.maxmemory=0
+  - equal:
+      path: spec.template.spec.containers[0].args[12]
+      value: -XX:InitialRAMPercentage=50
+  - equal:
+      path: spec.template.spec.containers[0].args[13]
+      value: -XX:MaxRAMPercentage=50
+
+        
+  # - isSubset:
+  #     path: spec.template.spec.initContainers[0].resources
+  #     content: *custom-resources

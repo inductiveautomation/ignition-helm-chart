@@ -1,0 +1,159 @@
+suite: Helper Template Tests
+release:
+  name: ignition
+  namespace: ignition-test
+templates:
+- tests/helpers.yaml
+chart:
+  version: 0.0.36
+  appVersion: 8.1.48
+set:
+  _testing.enabled: true
+tests:
+# ignition.fullname
+- it: evaluate fullname
+  asserts:
+  - equal:
+      path: metadata.name
+      value: ignition-helpers-test
+- it: evaluate fullname nameOverride
+  set:
+    nameOverride: "foo"
+  asserts:
+  - equal:
+      path: metadata.name
+      value: ignition-foo-helpers-test
+- it: evaluate fullname fullnameOverride
+  set:
+    fullnameOverride: "foo"
+  asserts:
+  - equal:
+      path: metadata.name
+      value: foo-helpers-test
+# ignition.gateway.useMaxRAMPercentage
+- it: evaluate gateway.useMaxRAMPercentage
+  asserts:
+  - equal:
+      path: data["gateway.useMaxRAMPercentage"]
+      value: true
+  - contains:
+      path: data["gateway.jvmArgs"]
+      content: -XX:InitialRAMPercentage=75
+  - contains:
+      path: data["gateway.jvmArgs"]
+      content: -XX:MaxRAMPercentage=75
+  - contains:
+      path: data["gateway.wrapperArgs"]
+      content: wrapper.java.initmemory=0
+  - contains:
+      path: data["gateway.wrapperArgs"]
+      content: wrapper.java.maxmemory=0
+- it: evaluate gateway.useMaxRAMPercentage with resources disabled
+  set:
+    gateway.resourcesEnabled: false
+  asserts:
+  - equal:
+      path: data["gateway.useMaxRAMPercentage"]
+      value: false
+  - notContains:
+      path: data["gateway.jvmArgs"]
+      content: -XX:InitialRAMPercentage=75
+  - notContains:
+      path: data["gateway.jvmArgs"]
+      content: -XX:MaxRAMPercentage=75
+  - notContains:
+      path: data["gateway.wrapperArgs"]
+      content: wrapper.java.initmemory=0
+  - notContains:
+      path: data["gateway.wrapperArgs"]
+      content: wrapper.java.maxmemory=0
+- it: evaluate gateway.useMaxRAMPercentage with 0 value
+  set:
+    gateway.maxRAMPercentage: 0
+  asserts:
+  - equal:
+      path: data["gateway.useMaxRAMPercentage"]
+      value: false
+# ignition.ingress.useProxyForwardedHeader
+- it: evaluate ingress.useProxyForwardedHeader
+  asserts:
+  - equal:
+      path: data["ingress.useProxyForwardedHeader"]
+      value: true
+  - contains:
+      path: data["gateway.gatewayArgs"]
+      content: gateway.useProxyForwardedHeader=true
+- it: evaluate ingress.useProxyForwardedHeader with ingress disabled
+  set:
+    ingress.enabled: false
+  asserts:
+  - equal:
+      path: data["ingress.useProxyForwardedHeader"]
+      value: false
+  - contains:
+      path: data["gateway.gatewayArgs"]
+      content: gateway.useProxyForwardedHeader=false
+# ignition.gateway.publicAddressEnvVarName
+- it: evaluate gateway.publicAddressEnvVarName
+  asserts:
+  - equal:
+      path: data["gateway.publicAddressEnvVarName"]
+      value: GATEWAY_PUBLIC_ADDRESS
+- it: evaluate gateway.publicAddressEnvVarName with custom value
+  set:
+    _testing.publicAddressEnvVarName: ["HTTP_PORT", "primary"]
+  asserts:
+  - equal:
+      path: data["gateway.publicAddressEnvVarName"]
+      value: GATEWAY_PUBLIC_HTTP_PORT_PRIMARY
+# ignition.renderCommaDelimitedArray
+- it: evaluate commaDelimitedArray
+  set:
+    _testing.commaDelimitedArray: ["a ", " b", "c "]
+  asserts:
+  - equal:
+      path: data.commaDelimitedArray
+      value: a,b,c
+# ignition.rinseThroughTpl
+- it: evaluate string format
+  set:
+    _testing.commaDelimitedArray: ["a ", " b", "c "]
+    _testing.rinseThroughTpl:
+      releaseName: "{{ .Release.Name }}"
+      chartName: "{{ .Chart.Name }}"
+  asserts:
+  - equal:
+      path: metadata.labels["releaseName"]
+      value: ignition
+  - equal:
+      path: metadata.labels["chartName"]
+      value: ignition
+- it: evaluate object format
+  set:
+    _testing.rinseThroughTpl:
+      releaseName: "{{ .Release.Name }}"
+      chartName: "{{ .Chart.Name }}"
+  asserts:
+  - equal:
+      path: metadata.labels["releaseName"]
+      value: ignition
+  - equal:
+      path: metadata.labels["chartName"]
+      value: ignition
+- it: evaluate null content
+  asserts:
+  - isSubset:
+      path: metadata.labels
+      content:
+        helm.sh/chart: ignition-0.0.36
+        app.kubernetes.io/name: ignition
+        app.kubernetes.io/instance: ignition
+        app.kubernetes.io/version: "8.1.48"
+        app.kubernetes.io/managed-by: Helm
+- it: evaluate invalid content
+  set:
+    _testing.rinseThroughTpl:
+      releaseName: "{{ .Reelease.Name }}" # cspell:disable-line
+  asserts:
+  - failedTemplate:
+      errorPattern: "^error calling include.*"

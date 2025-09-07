@@ -1,0 +1,19 @@
+commissioning:
+  edition: standard
+  acceptIgnitionEULA: true
+  disableQuickstart: true
+
+gateway:
+  redundancy:
+    enabled: true
+
+  env:
+    GATEWAY_NETWORK_REQUIRESSL: false
+
+  gan:
+    requireTwoWayAuth: false
+    securityPolicy: SpecifiedList
+    whitelist:
+    - ignition-backup
+
+  persistentVolumeClaimRetentionPolicy: Delete

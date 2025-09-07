@@ -1,0 +1,22 @@
+{{- with .Values.gateway.externalModules.createOptions }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $.Values.gateway.externalModules.pvcName | default (print (include "ignition.fullname" $) "-external-modules") }}
+  annotations:
+    helm.sh/resource-policy: {{ .helmResourcePolicy | default "keep" }}
+  labels:
+    {{- include "ignition.labels" $ | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .accessMode | default "ReadWriteMany" | quote }}
+  resources:
+    requests:
+      storage: {{ required "External Modules Create PVC: Must supply a size, e.g. '1Gi'" .size }}
+  {{- with .storageClassName }}
+  storageClassName: {{ . }}
+  {{- end }}
+  {{- with .other -}}
+  {{ toYaml . | nindent 2 }}
+  {{- end }}
+{{- end }}

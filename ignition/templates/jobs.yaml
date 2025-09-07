@@ -1,0 +1,164 @@
+{{/* GAN Certificate Rotation CronJob[s] */}}
+{{- if (and .Values.certManager.enabled .Values.certManager.ganCertificate.rotationEnabled) -}}
+{{- range $i := (until ((include "ignition.gateway.replicas" .) | int )) }}
+---
+{{- with $ -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ printf "%s-%s-%v-%s" (include "ignition.fullname" .) "gateway" $i "gan-cert-refresh" }}
+  labels:
+    {{- include "ignition.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.certManager.ganCertificate.rotationFrequency | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 60
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          securityContext:
+          {{- if .Values.podSecurityContext }}
+            {{ toYaml .Values.podSecurityContext | nindent 8 }}
+          {{- else }}
+            runAsUser: 2003
+            runAsGroup: 2003
+            fsGroup: 2003
+            runAsNonRoot: true
+          {{- end }}
+          restartPolicy: Never
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchExpressions:
+                      - key: app.kubernetes.io/name
+                        operator: In
+                        values:
+                        - {{ include "ignition.name" . }}
+                      - key: app.kubernetes.io/instance
+                        operator: In
+                        values:
+                        - {{ .Release.Name }}
+                      - key: apps.kubernetes.io/pod-index
+                        operator: In
+                        values:
+                          - {{ $i | quote }}
+                  topologyKey: "kubernetes.io/hostname"
+          containers:
+          - name: rotate-certs
+            image: {{ template "ignition.image-reference" . }}
+            command:
+            - /config/scripts/invoke-args.sh
+            args:
+            - /config/scripts/prepare-gan-certificates.sh
+            volumeMounts:
+            - mountPath: /data
+              name: ignition-data
+            - mountPath: /config/scripts
+              name: ignition-config-scripts
+              readOnly: true
+            - mountPath: /run/secrets/gan-issuer-tls
+              name: gan-issuer-tls
+              readOnly: true
+            - mountPath: /run/secrets/gan-tls
+              name: gan-tls
+              readOnly: true
+          volumes:
+          - name: ignition-config-scripts
+            configMap:
+              name: {{ template "ignition.fullname" . }}-config-scripts
+              defaultMode: 0755
+          - name: gan-issuer-tls
+            secret:
+              secretName: {{ include "ignition.gateway.ganIssuerSecret" . }}
+          - name: gan-tls
+            secret:
+              secretName: {{ include "ignition.gateway.ganCertificateSecret" . }}
+          - name: ignition-data
+            persistentVolumeClaim:
+              claimName: {{ printf "data-%s-%s-%v" (include "ignition.fullname" .) "gateway" $i }}
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+{{- end }}
+{{ end }}
+{{- end }}
+{{/* TLS Certificate Rotation CronJob[s] */}}
+{{- if (and .Values.gateway.tls.enabled .Values.certManager.enabled .Values.certManager.tlsCertificate.rotationEnabled) -}}
+{{- range $i := (until ((include "ignition.gateway.replicas" .) | int )) }}
+---
+{{- with $ -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ printf "%s-%s-%v-%s" (include "ignition.fullname" .) "gateway" $i "tls-cert-refresh" }}
+  labels:
+    {{- include "ignition.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.certManager.tlsCertificate.rotationFrequency | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 60
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          securityContext:
+          {{- if .Values.podSecurityContext }}
+            {{ toYaml .Values.podSecurityContext | nindent 8 }}
+          {{- else }}
+            runAsUser: 2003
+            runAsGroup: 2003
+            fsGroup: 2003
+            runAsNonRoot: true
+          {{- end }}
+          restartPolicy: Never
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchExpressions:
+                      - key: app.kubernetes.io/name
+                        operator: In
+                        values:
+                        - {{ include "ignition.name" . }}
+                      - key: app.kubernetes.io/instance
+                        operator: In
+                        values:
+                        - {{ .Release.Name }}
+                      - key: apps.kubernetes.io/pod-index
+                        operator: In
+                        values:
+                          - {{ $i | quote }}
+                  topologyKey: "kubernetes.io/hostname"
+          containers:
+          - name: rotate-certs
+            image: {{ template "ignition.image-reference" . }}
+            command:
+            - /config/scripts/invoke-args.sh
+            args:
+            - /config/scripts/prepare-tls-certificates.sh
+            volumeMounts:
+            - mountPath: /data
+              name: ignition-data
+            - mountPath: /config/scripts
+              name: ignition-config-scripts
+              readOnly: true
+            - mountPath: /run/secrets/web-tls
+              name: web-tls
+              readOnly: true
+          volumes:
+          - name: ignition-config-scripts
+            configMap:
+              name: {{ template "ignition.fullname" . }}-config-scripts
+              defaultMode: 0755
+          - name: web-tls
+            secret:
+              secretName: {{ include "ignition.gateway.tlsCertificateSecret" . }}
+          - name: ignition-data
+            persistentVolumeClaim:
+              claimName: {{ printf "data-%s-%s-%v" (include "ignition.fullname" .) "gateway" $i }}
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+{{- end }}
+{{ end }}
+{{- end }}

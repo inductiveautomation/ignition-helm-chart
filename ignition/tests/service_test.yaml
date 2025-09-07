@@ -1,0 +1,342 @@
+x-custom-ports: &custom-ports
+- &custom-port-1
+  name: http
+  port: 8090
+  targetPort: 8090
+- &custom-port-2
+  name: https
+  port: 8050
+  targetPort: 8050
+
+suite: Service Tests
+release:
+  name: ignition
+  namespace: ignition-test
+templates:
+- service.yaml
+tests:
+# General Service Tests
+- it: Renders Service
+  asserts:
+  - containsDocument:
+      kind: Service
+      apiVersion: v1
+      name: ignition
+# Validate Defaults
+- it: Validate Default Ports
+  asserts:
+  - isSubset:
+      path: spec
+      content:
+        ports:
+        - name: gan
+          port: 8060
+          targetPort: 8060
+        - name: http
+          port: 8088
+          targetPort: 8088
+        - name: https
+          port: 8043
+          targetPort: 8043 
+- it: Validate Default Service Type is ClusterIP
+  asserts:
+  - equal:
+      path: spec.type
+      value: ClusterIP
+  - equal:
+      path: spec.clusterIP
+      value: None
+- it: Validate Default Selector
+  asserts:
+  - isSubset:
+      path: spec.selector
+      content:
+        app.kubernetes.io/name: ignition
+        app.kubernetes.io/instance: ignition
+- it: Validate Single Service Document
+  asserts:
+  - hasDocuments:
+      count: 1
+# LoadBalancer Service Type Tests
+- it: Validate LoadBalancer Requires Ports
+  set:
+    service.type: LoadBalancer
+  asserts:
+  - failedTemplate:
+      errorMessage: "Must specify at least one LoadBalancer port"
+- it: Validate LoadBalancer Service Type
+  set:
+    service:
+      type: LoadBalancer
+      loadBalancerPorts:
+        http: 8089
+        https: 8044
+  asserts:
+  - equal:
+      path: spec.type
+      value: LoadBalancer
+  - equal:
+      path: spec.clusterIP
+      value: ""
+  - notExists:
+      path: spec.loadBalancerSourceRanges
+  - isSubset:
+      path: spec
+      content:
+        ports:
+        - name: http
+          port: 8089
+          targetPort: http
+        - name: https
+          port: 8044
+          targetPort: https
+- it: Validate LoadBalancer Source Ranges
+  set:
+    service:
+      type: LoadBalancer
+      loadBalancerPorts:
+        http: 8089
+      loadBalancerSourceRanges:
+        - 10.10.0.0/16
+  asserts:
+  - isSubset:
+      path: spec
+      content:
+        loadBalancerSourceRanges:
+        - 10.10.0.0/16
+# NodePort Service Type Tests
+- it: Validate NodePort Requires Ports
+  set:
+    service:
+      type: NodePort
+  asserts:
+  - failedTemplate:
+      errorMessage: "Must specify at least one NodePort port"
+- it: Validate NodePort Service Type
+  set:
+    service:
+      type: NodePort
+      nodePorts:
+        http: 30080
+        https: 30443
+  asserts:
+  - equal:
+      path: spec.type
+      value: NodePort
+  - equal:
+      path: spec.clusterIP
+      value: ""
+  - isSubset:
+      path: spec
+      content:
+        ports:
+        - name: http
+          port: 30080
+          targetPort: http
+        - name: https
+          port: 30443
+          targetPort: https
+# Custom Ports and Extra Spec
+- it: Validate Custom Ports
+  set:
+    service:
+      customPorts: *custom-ports
+  asserts:
+  - lengthEqual:
+      path: spec.ports
+      count: 2
+  - isSubset:
+      path: spec
+      content:
+        ports: *custom-ports
+- it: Validate Extra Service Spec
+  set:
+    service:
+      extraSpec:
+        sessionAffinity: ClientIP
+  asserts:
+  - equal:
+      path: spec.sessionAffinity
+      value: ClientIP
+# Redundancy Checks
+- it: Validate Redundancy Enabled
+  set:
+    gateway:
+      redundancy:
+        enabled: true
+  asserts:
+  - hasDocuments:
+      count: 3
+  - isSubset:
+      path: spec
+      content:
+        selector:
+          app.kubernetes.io/name: ignition
+          app.kubernetes.io/instance: ignition
+    documentIndex: 2
+  - isSubset:
+      path: spec
+      content:
+        selector:
+          app.kubernetes.io/name: ignition
+          app.kubernetes.io/instance: ignition
+          apps.kubernetes.io/pod-index: "0"
+    documentIndex: 0
+  - isSubset:
+      path: spec
+      content:
+        selector:
+          app.kubernetes.io/name: ignition
+          app.kubernetes.io/instance: ignition
+          apps.kubernetes.io/pod-index: "1"
+    documentIndex: 1
+- it: Validate Custom Ports with Redundancy
+  set:
+    gateway.redundancy.enabled: true
+    service:
+      customPorts: *custom-ports
+      # These ports are added to the base set, when defined
+      primaryCustomPorts:
+      - name: gan
+        port: 8061
+        targetPort: 8061
+  asserts:
+  # Primary Service
+  - lengthEqual:
+      path: spec.ports
+      count: 3
+    documentIndex: 0
+  - isSubset:
+      path: spec
+      content:
+        ports:
+        - *custom-port-1
+        - *custom-port-2
+        - name: gan
+          port: 8061
+          targetPort: 8061
+    documentIndex: 0
+  # Backup Service
+  - lengthEqual:
+      path: spec.ports
+      count: 2
+    documentIndex: 1
+  - isSubset:
+      path: spec
+      content:
+        ports:
+        - *custom-port-1
+        - *custom-port-2
+    documentIndex: 1
+  # Combined Service
+  - lengthEqual:
+      path: spec.ports
+      count: 2
+    documentIndex: 2
+  - isSubset:
+      path: spec
+      content:
+        ports: *custom-ports
+    documentIndex: 2
+- it: Validate Extra Spec with Redundancy
+  set:
+    gateway.redundancy.enabled: true
+    service:
+      extraSpec:
+        sessionAffinity: ClientIP
+      primaryExtraSpec:
+        foo: bar
+      backupExtraSpec:
+        bar: baz
+  asserts:
+  # Only primary should have foo
+  - notExists:
+      path: spec.foo
+    documentIndex: 2
+  - notExists:
+      path: spec.foo
+    documentIndex: 1
+  - isSubset:
+      path: spec
+      content:
+        foo: bar
+    documentIndex: 0
+  # Only backup should have bar
+  - notExists:
+      path: spec.bar
+    documentIndex: 2
+  - notExists:
+      path: spec.bar
+    documentIndex: 0
+  - isSubset:
+      path: spec
+      content:
+        bar: baz
+    documentIndex: 1
+  # All services should have sessionAffinity
+  - isSubset:
+      path: spec
+      content:
+        sessionAffinity: ClientIP
+# Pod-indexed Service Tests
+- it: Validate Pod-indexed Service
+  set:
+    gateway.replicas: 2
+    service.podIndexedServices:
+      create: true
+      annotations:
+        foo: bar
+  asserts:
+  - hasDocuments:
+      count: 3
+  # Combined Service
+  - notExists:
+      path: metadata.annotations
+    documentIndex: 0
+  - equal:
+      path: metadata.name
+      value: ignition
+    documentIndex: 0
+  - isSubset:
+      path: spec
+      content:
+        selector:
+          app.kubernetes.io/name: ignition
+          app.kubernetes.io/instance: ignition
+    documentIndex: 0
+  # Index 0
+  - isSubset:
+      path: metadata.annotations
+      content:
+        foo: bar
+    documentIndex: 1
+  - equal:
+      path: metadata.name
+      value: ignition-0
+    documentIndex: 1
+  - isSubset:
+      path: spec
+      content:
+        selector:
+          app.kubernetes.io/name: ignition
+          app.kubernetes.io/instance: ignition
+          apps.kubernetes.io/pod-index: "0"
+    documentIndex: 1
+  # Index 1
+  - isSubset:
+      path: metadata.annotations
+      content:
+        foo: bar
+    documentIndex: 1
+  - equal:
+      path: metadata.name
+      value: ignition-1
+    documentIndex: 2
+  - isSubset:
+      path: spec
+      content:
+        selector:
+          app.kubernetes.io/name: ignition
+          app.kubernetes.io/instance: ignition
+          apps.kubernetes.io/pod-index: "1"
+    documentIndex: 2

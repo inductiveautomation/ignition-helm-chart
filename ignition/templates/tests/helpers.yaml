@@ -1,0 +1,30 @@
+{{/*
+This ConfigMap is only rendered for use with unittest plugin.
+*/}}
+{{- with .Values._testing }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "ignition.fullname" $ }}-helpers-test
+  labels:
+    {{- include "ignition.labels" $ | nindent 4 }}
+    {{- include "ignition.rinseThroughTpl" (dict "context" $ "content" .rinseThroughTpl) | nindent 4 }}
+data:
+  commaDelimitedArray: {{ include "ignition.renderCommaDelimitedArray" .commaDelimitedArray | quote }}
+  gateway.useMaxRAMPercentage: {{ include "ignition.gateway.useMaxRAMPercentage" $ }}
+  {{- with (include "ignition.gateway.jvmArgs" $) }}
+  gateway.jvmArgs:
+  {{- . | indent 2 }}
+  {{- end }}
+  {{- with (include "ignition.gateway.gatewayArgs" $) }}
+  gateway.gatewayArgs:
+  {{- . | indent 2 }}
+  {{- end }}
+  {{- with (include "ignition.gateway.wrapperArgs" $) }}
+  gateway.wrapperArgs:
+  {{- . | indent 2 }}
+  {{- end }}
+  gateway.publicAddressEnvVarName: {{ include "ignition.gateway.publicAddressEnvVarName" (.publicAddressEnvVarName | default (list "ADDRESS" "")) }}
+  ingress.useProxyForwardedHeader: {{ include "ignition.ingress.useProxyForwardedHeader" $ }}
+{{- end }}

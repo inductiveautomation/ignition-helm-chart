@@ -1,0 +1,368 @@
+{{- $configChecksum := include (print $.Template.BasePath "/configmap.yaml") . | sha256sum -}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ template "ignition.fullname" . }}-gateway
+  labels:
+    {{- include "ignition.labels" . | nindent 4 }}
+    {{- with .Values.podLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  annotations:
+    checksum/config: {{ $configChecksum }}
+spec:
+  {{- with .Values.gateway.supplementalStatefulSetSpec -}}
+  {{/* NOTE: If you're using this, consider informing IA to add more specific functionality to the chart! */}}
+  {{- . | toYaml | nindent 2 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "ignition.selectorLabels" . | nindent 6 }}
+  serviceName: {{ template "ignition.fullname" . }}
+  replicas: {{ include "ignition.gateway.replicas" . }}
+  {{- with .Values.gateway.updateStrategy }}
+  updateStrategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+      {{- include "ignition.labels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ $configChecksum }}
+      {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.podExtraSpec }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "ignition.serviceAccountName" . }}
+      securityContext:
+      {{- if .Values.podSecurityContext }}
+        {{ toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- else }}
+        runAsUser: 2003
+        runAsGroup: 2003
+        fsGroup: 2003
+        runAsNonRoot: true
+      {{- end }}
+      {{- if or .Values.affinity .Values.podAntiAffinity }}
+      affinity:
+        {{- with .Values.affinity }}
+          {{- if $.Values.podAntiAffinity }}
+            {{- fail "affinity cannot be specified with podAntiAffinity=true" }}
+          {{- end }}
+
+          {{- (include "ignition.rinseThroughTpl" (dict "context" $ "content" .)) | nindent 8 }}
+        {{- end }}
+        {{- if .Values.podAntiAffinity }}
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                - {{ include "ignition.name" . }}
+              - key: app.kubernetes.io/instance
+                operator: In
+                values:
+                - {{ .Release.Name }}
+            topologyKey: kubernetes.io/hostname
+        {{- end }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: gateway
+        {{- with .Values.gateway.extraSpec }}
+        {{- toYaml . | nindent 8}}
+        {{- end }}
+        image: {{ template "ignition.image-reference" . }}
+        {{- with .Values.image.pullPolicy }}
+        imagePullPolicy: {{ . | quote }}
+        {{- end }}
+        {{- include "ignition.gateway.resources" . | indent 6 }}
+        command:
+        - /config/scripts/docker-entrypoint-shim.sh
+        args:
+        {{- with (include "ignition.gateway.runtimeArgs" .) }}
+        {{- . | indent 8 }}
+        {{- end }}
+        {{- with .Values.gateway.runtimeArgs }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        - --
+        {{- include "ignition.gateway.supplementalArgs" . | indent 8 }}
+        ports:
+        {{- include "ignition.gateway.containerPorts" . | indent 8 }}
+        env:
+        {{- if eq "true" (include "ignition.gateway.useIndexedSystemName" .) }}
+        - name: GATEWAY_POD_INDEX
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.labels['apps.kubernetes.io/pod-index']
+        {{- end }}
+        {{- with .Values.image.entrypoint }}
+        - name: IGNITION_DOCKER_ENTRYPOINT
+          value: {{ . }}
+        {{- end }}
+        {{- include "ignition.gateway.env" . | indent 8 }}
+        envFrom:
+        - configMapRef:
+            name: {{ template "ignition.fullname" . }}-config-base
+        {{- with .Values.gateway.envFrom }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        volumeMounts:
+        - mountPath: /usr/local/bin/ignition/data
+          name: data
+        - mountPath: /config/scripts
+          name: config-scripts
+          readOnly: true
+        - mountPath: /config/files
+          name: config-files
+          readOnly: true
+        - mountPath: /run/secrets/ignition
+          name: secrets
+          readOnly: true
+        {{- if dig "certificateActivation" "enabled" false .Values.gateway.licensing }}
+        - mountPath: /usr/local/bin/ignition/data/certificate-activation
+          name: certificate-activation
+        {{- end }}
+        {{- if .Values.gateway.externalModules.enabled }}
+        {{- with .Values.gateway.externalModules}}
+        - mountPath: /media/shared-files/modules
+          name: external-modules
+          {{- if (and .mountSubPath .mountSubPathExpr) }}
+          {{- fail "External Modules: Cannot define both mountSubPath and mountSubPathExpr" -}}
+          {{- else if .mountSubPath }}
+          subPath: {{ .mountSubPath }}
+          {{- else if .mountSubPathExpr }}
+          subPathExpr: {{ .mountSubPathExpr }}
+          {{- end }}
+          {{- if .mountReadOnly }}
+          readOnly: true
+          {{- end }}
+        {{- end }}
+        {{- end }}
+        {{- with .Values.gateway.volumeMounts -}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.gateway.livenessProbe }}
+        livenessProbe: {{ toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .Values.gateway.readinessProbe }}
+        readinessProbe:
+          exec:
+            command:
+            {{- if not (empty .commandOverride) }}
+            {{- toYaml .commandOverride | nindent 12 }}
+            {{- else }}
+            {{- if (and $.Values.gateway.redundancy $.Values.gateway.redundancy.enabled)}}
+            - "/config/scripts/redundant-health-check.sh"
+            {{- else }}
+            - "health-check.sh"
+            {{- end }}
+            - "-t"
+            - {{ $.Values.gateway.readinessProbe.timeoutSeconds | default 3 | quote }}
+            {{- end }}
+          initialDelaySeconds: {{ .initialDelaySeconds }}
+          periodSeconds: {{ .periodSeconds }}
+          failureThreshold: {{ .failureThreshold }}
+          timeoutSeconds: {{ .timeoutSeconds }}
+        {{- end }}
+      {{- with .Values.gateway.extraContainers }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+      initContainers:
+      {{- if (.Values.gateway.preconfigure.enabled) }}
+      - name: preconfigure
+        {{- with .Values.gateway.preconfigure.extraSpec }}
+        {{- toYaml . | nindent 8}}
+        {{- end }}
+        image: {{ template "ignition.image-reference" . }}
+        {{- with .Values.image.pullPolicy }}
+        imagePullPolicy: {{ . | quote }}
+        {{- end }}
+        {{- include "ignition.gateway.resources" . | indent 6 }}
+        command:
+        - /config/scripts/invoke-args.sh
+        args:
+        {{- if (.Values.gateway.preconfigure.seedDataVolume) }}
+        - /config/scripts/seed-data-volume.sh
+        {{- end }}
+        {{- if (.Values.certManager.enabled) }}
+        - /config/scripts/prepare-gan-certificates.sh
+        {{- end }}
+        {{- if (.Values.gateway.tls.enabled) }}
+        - /config/scripts/prepare-tls-certificates.sh
+        {{- end }}
+        {{- with (include "ignition.gateway.licensing.redundancyPrepareSh" .) }}
+        - {{ . }}
+        {{- end }}
+        {{- with .Values.gateway.preconfigure.additionalCmds }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        - echo "Preconfiguration Completed"
+        {{- if .Values.gateway.redundancy.enabled }}
+        {{- with (include "ignition.gateway.publicAddressEnvs" (list . "array")) }}
+        env:
+        {{- . | indent 8 }}
+        {{- end }}
+        {{- end }}
+        volumeMounts:
+        - mountPath: /data
+          name: data
+        - mountPath: /config/files
+          name: config-files
+        - mountPath: /config/scripts
+          name: config-scripts
+        {{- if .Values.certManager.enabled }}
+        - mountPath: /run/secrets/gan-tls
+          name: gan-tls
+          readOnly: true
+        - mountPath: /run/secrets/gan-issuer-tls
+          name: gan-issuer-tls
+          readOnly: true
+        {{- end }}
+        {{- if .Values.gateway.tls.enabled }}
+        - mountPath: /run/secrets/web-tls
+          name: web-tls
+          readOnly: true
+        {{- end }}
+        {{- with .Values.gateway.preconfigureVolumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.gateway.initContainers }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+      volumes:
+      {{- if .Values.gateway.externalModules.enabled }}
+      {{- with .Values.gateway.externalModules }}
+      - name: external-modules
+        persistentVolumeClaim:
+          claimName: {{ .pvcName | default (print (include "ignition.fullname" $) "-external-modules") }}
+      {{- end }}
+      {{- end }}
+      {{- if dig "certificateActivation" "enabled" false .Values.gateway.licensing }}
+      {{- with .Values.gateway.licensing.certificateActivation }}
+      - name: certificate-activation
+        projected:
+          sources:
+          - secret:
+              name: {{ .certSecretName | default (print (include "ignition.fullname" $) "-license-cert") }}
+              items:
+              - key: tls.crt
+                path: license.crt
+                mode: 0640
+              - key: tls.key
+                path: license.key
+                mode: 0640
+          - secret:
+              name: {{ .configSecretName | default (print (include "ignition.fullname" $) "-license-config") }}
+              items:
+              - key: {{ .configSecretKey | default "license.jws" }}
+                path: config.json
+                mode: 0640
+      {{- end }}
+      {{- end }}
+      - name: config-scripts
+        configMap:
+          name: {{ template "ignition.fullname" . }}-config-scripts
+          defaultMode: 0755
+      - name: config-files
+        configMap:
+          name: {{ template "ignition.fullname" . }}-config-files
+          defaultMode: 0644
+      - name: secrets
+        projected:
+          sources:
+          {{- if not (empty .Values.commissioning.auth.adminUsername) }}
+          - secret:
+              name: {{ include "ignition.gateway.gatewayAdminSecret" . }}
+              items:
+              {{- with .Values.commissioning.auth.adminPasswordKey }}
+              - key: {{ . }}
+                path: "gateway-admin-password"
+              {{- end }}
+          {{- end }}
+          {{- with .Values.gateway.licensing.leasedActivation }}
+          {{- include "ignition.gateway.licensing.setDefaults" . }}
+          - secret:
+              name: {{ required "Must supply licensing Secret name" .secretName }}
+              items:
+              - key: {{ .licenseKeyKey }}
+                path: "ignition-license-key"
+              - key: {{ .activationTokenKey }}
+                path: "ignition-activation-token"
+          {{- end }}
+          {{- range $redundancyMode := (.Values.gateway.redundancy.enabled | ternary (list "primary" "backup") list) -}}
+          {{- with (get $.Values.gateway.licensing (printf "%sLeasedActivation" $redundancyMode)) }}
+          {{- include "ignition.gateway.licensing.setDefaults" . }}
+          - secret:
+              name: {{ required (printf "Must supply %s licensing Secret name" $redundancyMode) .secretName }}
+              items:
+              - key: {{ .licenseKeyKey }}
+                path: {{ printf "%s-ignition-license-key" $redundancyMode }}
+              - key: {{ .activationTokenKey }}
+                path: {{ printf "%s-ignition-activation-token" $redundancyMode }}
+          {{- end }}
+          {{- end }}
+      {{- if .Values.certManager.enabled }}
+      - name: gan-issuer-tls
+        secret:
+          secretName: {{ include "ignition.gateway.ganIssuerSecret" . }}
+          items:
+            - key: tls.crt
+              path: tls.crt
+      - name: gan-tls
+        secret:
+          secretName: {{ include "ignition.gateway.ganCertificateSecret" . }}
+      {{- end }}
+      {{- if .Values.gateway.tls.enabled }}
+      - name: web-tls
+        secret:
+          secretName: {{ include "ignition.gateway.tlsCertificateSecret" . }}
+      {{- end }}
+      {{- with .Values.gateway.volumes -}}
+      {{ toYaml . | nindent 6 }}
+      {{- end }}
+      {{- with .Values.gateway.supplementalStatefulSetPodSpec -}}
+      {{/* NOTE: If you're using this, consider informing IA to add more specific functionality to the chart! */}}
+      {{- . | toYaml | nindent 6 }}
+      {{- end }}
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: {{ .Values.gateway.persistentVolumeClaimRetentionPolicy }}
+    whenScaled: Retain
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+    {{- if .Values.gateway.dataVolumeCustomSpec -}}
+      {{- .Values.gateway.dataVolumeCustomSpec | toYaml | nindent 6 }}
+    {{- else }}
+      accessModes: [ "ReadWriteOnce" ]
+      {{- if not (empty .Values.gateway.dataVolumeStorageClass) }}
+      storageClassName: {{ .Values.gateway.dataVolumeStorageClass }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.gateway.dataVolumeStorageSize | default "3Gi"}}
+    {{- end }}
+  {{- with .Values.gateway.volumeClaimTemplates -}}
+    {{- . | toYaml | nindent 2 }}
+  {{- end }}

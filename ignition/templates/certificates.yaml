@@ -1,0 +1,141 @@
+{{- if .Values.certManager.enabled }}
+{{- $tlsIssuerName := (include "ignition.gateway.tlsIssuerName" .) -}}
+{{- if (and .Values.certManager.tlsIssuer.create .Values.gateway.tls.enabled) }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $tlsIssuerName }}
+  labels:
+    {{- include "ignition.labels" . | nindent 4 }}
+spec: 
+  {{- if .Values.certManager.tlsIssuer.customSpec }}
+  {{- toYaml .Values.certManager.tlsIssuer.customSpec | nindent 2 }}
+  {{- else }}
+  {{- with .Values.certManager.tlsIssuer.spec }}
+  commonName: {{ .commonNameOverride | default $tlsIssuerName }}
+  duration: {{ .duration }}
+  isCA: true
+  issuerRef:
+    name: {{ .issuerRefName }}
+    kind: {{ .issuerRefKind }}
+    group: {{ .issuerRefGroup }}
+  privateKey:
+    algorithm: {{ .privateKeyAlgorithm }}
+    size: {{ .privateKeySize }}
+  secretName: {{ .secretNameOverride | default $tlsIssuerName }}
+  {{- end }}
+  {{- end }}
+{{ end }}{{- /* end of tlsIssuer.create */ -}}
+{{- $ganIssuerName := (include "ignition.gateway.ganIssuerName" .) -}}
+{{- if .Values.certManager.ganIssuer.create }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $ganIssuerName }}
+  labels:
+    {{- include "ignition.labels" . | nindent 4 }}
+spec: 
+  {{- if .Values.certManager.ganIssuer.customSpec }}
+  {{- toYaml .Values.certManager.ganIssuer.customSpec | nindent 2 }}
+  {{- else }}
+  {{- with .Values.certManager.ganIssuer.spec }}
+  commonName: {{ .commonNameOverride | default $ganIssuerName }}
+  duration: {{ .duration }}
+  isCA: true
+  issuerRef:
+    name: {{ .issuerRefName }}
+    kind: {{ .issuerRefKind }}
+    group: {{ .issuerRefGroup }}
+  privateKey:
+    algorithm: {{ .privateKeyAlgorithm }}
+    size: {{ .privateKeySize }}
+  secretName: {{ .secretNameOverride | default $ganIssuerName }}
+  {{- end }}
+  {{- end }}
+{{ end }}{{- /* end of ganIssuer.create */ -}}
+{{- if .Values.certManager.ganCertificate.create }}
+{{- if .Values.gateway.gan.existingSecret -}}
+{{- fail "Cannot declare .Values.certManager.ganCertificate.create and .Values.gateway.gan.existingSecret" -}}
+{{- end -}}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ template "ignition.gateway.ganCertificateName" . }}
+  labels:
+    {{- include "ignition.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.certManager.ganCertificate.customSpec }}
+  {{- toYaml .Values.certManager.ganCertificate.customSpec | nindent 2 }}
+  {{- else }}
+  {{- with .Values.certManager.ganCertificate.spec }}
+  commonName: {{ .commonNameOverride | default (include "ignition.fullname" $) }}
+  dnsNames:
+  {{- if .dnsNames -}}
+  {{- range $dnsName := .dnsNames }}
+  - {{ $dnsName | quote }}
+  {{- end -}}
+  {{- else }}
+  - {{ printf "*.%s" (include "ignition.fullname" $) | quote }}
+  {{- end }}
+  duration: {{ .duration }}
+  issuerRef:
+    name: {{ $ganIssuerName }}
+    kind: {{ $.Values.certManager.ganIssuer.kind }}
+    group: {{ $.Values.certManager.ganIssuer.group }}
+  keystores:
+    pkcs12:
+      create: true
+      passwordSecretRef:
+        name: {{ include "ignition.gateway.ganKeystoreSecret" $ }}
+        key: {{ $.Values.gateway.gan.keystorePasswordKey }}
+  secretName: {{ include "ignition.gateway.ganCertificateSecret" $ }}
+  {{- end }}
+  {{- end }}
+{{ end }}
+{{- if and .Values.gateway.tls.enabled .Values.certManager.tlsCertificate.create }}
+{{- if .Values.gateway.tls.existingSecret -}}
+{{- fail "Cannot declare .Values.certManager.tlsCertificate.create and .Values.gateway.tls.existingSecret" -}}
+{{- end -}}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ template "ignition.gateway.tlsCertificateName" . }}
+  labels:
+    {{- include "ignition.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.certManager.tlsCertificate.customSpec }}
+  {{- toYaml .Values.certManager.tlsCertificate.customSpec | nindent 2 }}
+  {{- else }}
+  {{- with .Values.certManager.tlsCertificate.spec }}
+  commonName: {{ .commonNameOverride | default (include "ignition.fullname" $) }}
+  dnsNames:
+  {{- if .dnsNames -}}
+  {{- range $dnsName := .dnsNames }}
+  - {{ $dnsName | quote }}
+  {{- end -}}
+  {{- else if $.Values.gateway.redundancy.enabled }}
+  - {{ printf "%s-primary.%s.%s" (include "ignition.fullname" $) $.Release.Namespace "svc.cluster.local" | quote }}
+  - {{ printf "%s-backup.%s.%s" (include "ignition.fullname" $) $.Release.Namespace "svc.cluster.local" | quote }}
+  {{- else }}
+  - {{ printf "%s.%s.%s" (include "ignition.fullname" $) $.Release.Namespace "svc.cluster.local" | quote }}
+  {{- end }}
+  duration: {{ .duration }}
+  issuerRef:
+    name: {{ $tlsIssuerName }}
+    kind: {{ $.Values.certManager.tlsIssuer.kind }}
+    group: {{ $.Values.certManager.tlsIssuer.group }}
+  keystores:
+    pkcs12:
+      create: true
+      passwordSecretRef:
+        name: {{ include "ignition.gateway.tlsKeystoreSecret" $ }}
+        key: {{ $.Values.gateway.tls.keystorePasswordKey }}
+  secretName: {{ include "ignition.gateway.tlsCertificateSecret" $ }}
+  {{- end }}
+  {{- end }}
+{{- end }}
+{{ end }}

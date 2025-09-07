@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "ignition.fullname" . }}-test-gwinfo"
+  labels:
+    {{- include "ignition.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    {{- $redundancyModeList := .Values.gateway.redundancy.enabled | ternary (list "primary" "backup") (list "") }}
+    - name: validator
+      image: {{ template "ignition.image-reference" . }}
+      workingDir: /home/ignition
+      command:
+      - /config/scripts/invoke-args.sh
+      volumeMounts:
+      - mountPath: /config/scripts
+        name: config-scripts
+      {{- $protocol := .Values.gateway.tls.enabled | ternary "https" "http" }}
+      args:
+      {{- range $redundancyMode := $redundancyModeList }}
+      {{- $hostName := (include "ignition.service.serviceName" (dict "context" $ "suffix" $redundancyMode)) }}
+      {{- $port := (eq $protocol "https" | ternary $.Values.gateway.ports.https $.Values.gateway.ports.http) }}
+      {{- $gwinfoUrl := printf "%s://%s:%v/system/gwinfo" $protocol $hostName $port }}
+      {{- $redundancyStatus := empty $redundancyMode | ternary "Independent" 
+        ((eq $redundancyMode "primary") | ternary "Master" "Backup") }}
+      - curl -fsSL {{ $gwinfoUrl }} | tee output.txt && echo
+      - 'echo -n "Checking ContextStatus=RUNNING: "'
+      - grep -q output.txt -e "ContextStatus=RUNNING;" && echo "OK"
+      - 'echo -n "Checking RedundancyStatus={{ $redundancyStatus }}: "'
+      - grep -q output.txt -e "RedundancyStatus={{ $redundancyStatus }};" && echo "OK"
+      {{- end }}
+  restartPolicy: Never
+  volumes:
+  - name: config-scripts
+    configMap:
+      name: {{ template "ignition.fullname" . }}-config-scripts
+      defaultMode: 0755

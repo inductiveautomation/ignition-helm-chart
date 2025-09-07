@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "ignition.fullname" . }}-config-base
+  labels:
+    {{- include "ignition.labels" . | nindent 4 }}
+data:
+  # Note: these may be overridden by explicit env definitions in the StatefulSet pod spec
+{{- /* TODO: Introduce a helper template that will coalesce these from any explicitly supplied env vars*/ -}}
+{{- if has ($.Values.commissioning.acceptIgnitionEULA | toString) ( list "true"  "Y" ) }}
+  ACCEPT_IGNITION_EULA: "Y"
+{{- end }}
+{{- if $.Values.commissioning.disableQuickstart }}
+  DISABLE_QUICKSTART: "true"
+{{- end }}
+{{- with .Values.commissioning.auth.adminUsername }}
+  {{- if not (eq . "admin") }}
+  GATEWAY_ADMIN_USERNAME: {{ . | quote }}
+  {{- end }}
+  GATEWAY_ADMIN_PASSWORD_FILE: /run/secrets/ignition/gateway-admin-password
+{{- end }}
+{{- with .Values.commissioning.edition }}
+  IGNITION_EDITION: {{ . | quote }}
+{{- end }}
+{{- include "ignition.gateway.ganRequireTwoWayAuth" . | indent 2 }}
+{{- if and .Values.certManager.enabled (not .Values.gateway.gan.securityPolicy) }}
+  GATEWAY_NETWORK_SECURITYPOLICY: "Unrestricted"  # set based on certificate auth enforcement
+{{- else -}}
+  {{- with .Values.gateway.gan.securityPolicy }}
+  GATEWAY_NETWORK_SECURITYPOLICY: {{ . | quote }}
+    {{- if and (eq "SpecifiedList" .) (gt (len $.Values.gateway.gan.whitelist) 0) }}
+  GATEWAY_NETWORK_WHITELIST: {{ include "ignition.renderCommaDelimitedArray" $.Values.gateway.gan.whitelist | quote }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- if (and .Values.gateway.redundancy.enabled (hasKey .Values.gateway.licensing "primaryLeasedActivation") (hasKey .Values.gateway.licensing "backupLeasedActivation")) }}
+  IGNITION_LICENSE_KEY_FILE: data/local/.ignition-license-key
+  IGNITION_ACTIVATION_TOKEN_FILE: data/local/.ignition-activation-token
+{{- else if .Values.gateway.licensing.leasedActivation }}
+  IGNITION_LICENSE_KEY_FILE: /run/secrets/ignition/ignition-license-key
+  IGNITION_ACTIVATION_TOKEN_FILE: /run/secrets/ignition/ignition-activation-token
+{{- end }}
+{{- include "ignition.gateway.portEnvs" . | indent 2 }}
+{{- include "ignition.gateway.ganOutgoingConnections" . | indent 2 }}
+{{- if .Values.gateway.externalModules.enabled }}
+{{- with .Values.gateway.externalModules }}
+  IGNITION_HELM_LOAD_EXTERNAL_MODULES: "true"
+  IGNITION_HELM_LOAD_EXTERNAL_MODULES_REPLACE: {{ .replaceExistingModules | quote }}
+{{- end }}
+{{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "ignition.fullname" . }}-config-files
+  labels:
+    {{- include "ignition.labels" . | nindent 4 }}
+data:
+{{- if (and .Values.gateway.redundancy .Values.gateway.redundancy.enabled) }}
+{{ tpl (.Files.Glob "config/redundancy-*.xml").AsConfig . | indent 2 }}
+{{- end }}
+{{ tpl (.Files.Glob "config/logback.xml").AsConfig . | indent 2 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "ignition.fullname" . }}-config-scripts
+  labels:
+    {{- include "ignition.labels" . | nindent 4 }}
+data:
+{{ (.Files.Glob "scripts/*.sh").AsConfig | indent 2 }}

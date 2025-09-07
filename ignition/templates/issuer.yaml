@@ -1,0 +1,23 @@
+{{- if .Values.certManager.enabled }}
+{{- $ganIssuerName := (include "ignition.gateway.ganIssuerName" .) -}}
+{{- $tlsIssuerName := (include "ignition.gateway.tlsIssuerName" .) -}}
+{{- if .Values.certManager.ganIssuer.create }}
+apiVersion: cert-manager.io/v1
+kind: {{ .Values.certManager.ganIssuer.kind }}
+metadata:
+  name: {{ $ganIssuerName }}
+spec:
+  ca:
+    secretName: {{ include "ignition.gateway.ganIssuerSecret" . }}
+{{- end }}
+---
+{{- if (and .Values.certManager.tlsIssuer.create .Values.gateway.tls.enabled) }}
+apiVersion: cert-manager.io/v1
+kind: {{ .Values.certManager.tlsIssuer.kind }}
+metadata:
+  name: {{ $tlsIssuerName }}
+spec:
+  ca:
+    secretName: {{ include "ignition.gateway.tlsIssuerSecret" . }}
+{{- end }}
+{{- end }}

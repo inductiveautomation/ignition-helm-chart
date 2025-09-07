@@ -1,0 +1,55 @@
+x-default-readiness-probe: &default-readiness-probe
+  exec:
+    command:
+    - "health-check.sh"
+    - "-t"
+    - "3"
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  failureThreshold: 2
+  timeoutSeconds: 3
+
+suite: Probes Tests
+release:
+  name: ignition
+  namespace: ignition-test
+templates:
+- statefulset.yaml
+- configmap.yaml
+tests:
+# Readiness Probe tests
+- it: Validate Default Readiness Probe
+  template: statefulset.yaml
+  asserts:
+  - isSubset:
+      path: spec.template.spec.containers[0].readinessProbe
+      content: *default-readiness-probe
+- it: Validate Default Readiness Probe with Redundancy Enabled
+  template: statefulset.yaml
+  set:
+    gateway.redundancy.enabled: true
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[0].readinessProbe.exec.command
+      content: "/config/scripts/redundant-health-check.sh"
+- it: Validate Custom Readiness Probe
+  template: statefulset.yaml
+  set:
+    gateway.readinessProbe:
+      commandOverride:
+      - "custom-health-check.sh"
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 4
+  asserts:
+  - isSubset:
+      path: spec.template.spec.containers[0].readinessProbe
+      content:
+        exec:
+          command:
+          - "custom-health-check.sh"
+        initialDelaySeconds: 15
+        periodSeconds: 10
+        failureThreshold: 3
+        timeoutSeconds: 4

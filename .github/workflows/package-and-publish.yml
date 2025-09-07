@@ -1,0 +1,107 @@
+name: Package and Publish Helm Chart
+
+# Execute on push of a tag of the form vX.Y.Z
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  package-and-publish:
+    name: Package and Publish
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    env:
+      # Empty values are set in the 'Compute environment variables' step
+      CHART_NAME: ignition
+      CHART_FILE: ""
+      CHART_FILE_VERSION: ""
+    steps:
+    - name: Checkout Repository at tag ref
+      uses: actions/checkout@v5
+
+    - name: Compute environment variables
+      run: |
+        declare -A EXTRA_ENV=(
+          [CHART_FILE]=".deploy/${CHART_NAME}-${GITHUB_REF_NAME#v}.tgz"
+          [CHART_FILE_VERSION]="v$(helm show chart ignition | yq -r '.version')"
+        )
+        for key in "${!EXTRA_ENV[@]}"; do
+          echo "${key}=${EXTRA_ENV[$key]}" >> $GITHUB_ENV
+        done
+
+    - name: Verify Chart.yaml version matches tag
+      run: |
+        if [[ "${GITHUB_REF_NAME}" != "${CHART_FILE_VERSION:?missing}" ]]; then
+          echo "Chart version ${CHART_FILE_VERSION} does not match tag ${GITHUB_REF_NAME}. Please verify the version in Chart.yaml"
+          exit 1
+        fi
+
+    - name: Generate short-lived token for charts repo access
+      id: app-token
+      uses: actions/create-github-app-token@v2
+      with:
+        app-id: ${{ secrets.GH_APP_ID }}
+        private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+        repositories: charts
+
+    - name: Extract user ID from token for git config
+      id: get-user-id
+      run: echo "user-id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+      env:
+        GH_TOKEN: ${{ steps.app-token.outputs.token }}
+
+    - name: Import GPG signing key
+      run: |
+        mkdir -m 0700 -p ~/.gnupg
+        echo "${GPG_SECRING_B64}" | base64 -d > ~/.gnupg/secring.gpg
+      env:
+        GPG_SECRING_B64: ${{ secrets.GPG_SECRING_B64 }}
+
+    - name: Package, sign, and verify Ignition Helm chart
+      run: |
+        echo "${GPG_PASSPHRASE}" | helm package \
+          --sign --key "${GPG_KEY_ID}" --keyring ~/.gnupg/secring.gpg \
+          --passphrase-file - \
+          --destination .deploy "${CHART_NAME}" && \
+        helm verify --keyring ~/.gnupg/secring.gpg "${CHART_FILE}"
+      env:
+        GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+        GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+    - name: Clone primary charts repo for Helm repo index update
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ github.repository_owner }}/charts
+        ref: main
+        path: charts
+        token: ${{ steps.app-token.outputs.token }}
+        persist-credentials: false
+
+    - name: Generate Helm repo index
+      run: |
+        helm repo index .deploy \
+          --url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}" \
+          --merge charts/docs/static/index.yaml
+        mv -v .deploy/index.yaml charts/docs/static/index.yaml
+
+    - name: Commit and push charts repo changes
+      working-directory: ./charts
+      run: |
+        git config --global user.name '${{ steps.app-token.outputs.app-slug }}[bot]'
+        git config --global user.email '${{ steps.get-user-id.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com'
+        git add .
+        git commit -m "Release automation for '${CHART_NAME}' chart ${GITHUB_REF_NAME}"
+        git remote set-url origin https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/${{ github.repository_owner }}/charts
+        git push origin main
+
+    - name: Create GitHub release
+      run: |
+        gh release create "${GITHUB_REF_NAME}" \
+          --generate-notes \
+          --target "${GITHUB_SHA}" \
+          "${CHART_FILE}" \
+          "${CHART_FILE}.prov"
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

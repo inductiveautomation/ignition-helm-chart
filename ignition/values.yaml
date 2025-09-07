@@ -1,0 +1,584 @@
+# Default Values for Ignition Helm Chart
+
+# -- Ignition Image Configuration
+image:
+  # -- Ignition image host registry
+  registry: docker.io
+  # -- Ignition image repository
+  repository: inductiveautomation/ignition
+  # -- Defaults to the appVersion
+  tag: ""
+  # -- Ignition image pull policy, one of "IfNotPresent" or "Always", defaults to Pod behavior if unset.
+  pullPolicy: IfNotPresent
+  # -- Defines custom secrets for pulling the Ignition image from a private registry.
+  pullSecrets: []
+  # -- Defines a custom entrypoint script to launch the Gateway, defaults to `/usr/local/bin/docker-entrypoint.sh`
+  entrypoint: ""
+
+# -- Ignition Commissioning Configuration
+commissioning:
+  # -- Ignition Edition to use, one of "standard", "edge", "cloud", or "maker"
+  edition: ""
+  # -- Set to true to accept the Ignition EULA
+  acceptIgnitionEULA: false
+  # -- When true, disable the quickstart project prompts on first launch
+  disableQuickstart: false
+  # -- Initial Gateway Admin Configuration
+  auth:
+    # -- Defines the initial gateway admin username
+    adminUsername: admin
+    # -- Override to use an existing Secret for the gateway admin password
+    # Default is to generate a random password and store in an associated secret
+    # with a dynamically generated name (based on the Helm release).
+    existingSecret: ""
+    # -- The Secret key under which the gateway admin password is stored
+    adminPasswordKey: "gateway-admin-password"
+    # -- Defines a Helm resource policy to attach to the secret.
+    # secretResourcePolicy: keep
+
+# -- Ignition Gateway configuration
+gateway:
+  # -- Optionally define the gateway system name instead of using the Helm release name
+  # systemNameOverride: backend
+
+  # -- Set to true to always used the pod index as a suffix for the gateway system name, e.g. `-0`
+  # Note: Only applicable when redundancy is disabled.  It is also automatically applied when replicas > 1.
+  # systemNameUseIndexed: true
+
+  # -- Add loggers (key) and their levels (value) in this map to override their default log
+  # levels.  These will persist across gateway restarts.
+  loggers: {}
+    # gateway.SslManager: DEBUG
+
+  # -- Ignition Licensing Configuration
+  licensing:
+    # -- Ignition Leased Activation (8-digit) Configuration
+    # Uncomment and set the `secretName` and optionally the key name overrides to enable
+    # leased activation licensing.  To apply multiple 8-digit keys, have the Secret contain
+    # comma-delimited lists of keys and their respective tokens.
+    # Use `primaryLeasedActivation` and `backupLeasedActivation` keys if you wish to apply
+    # different licenses to the primary and backup gateways with redundancy enabled.
+    leasedActivation: {}
+      # -- Apply a leased activation key/token by specifying an existing Secret name.
+      # secretName: "leased-license1"
+      # -- Specify the Secret key under which the license key is stored
+      # licenseKeyKey: "ignition-license-key"
+      # -- Specify the Secret key under which the activation token is stored
+      # activationTokenKey: "ignition-activation-token"
+
+  # -- Ignition Redundancy Configuration
+  redundancy:
+    # -- Set to true to enable redundancy across a 2-replica count StatefulSet, where
+    # the first index (0) is primary/master and the second index (1) is backup/slave.
+    enabled: false
+
+  # -- Replicas (ignored when redundancy is enabled)
+  replicas: 1
+
+  # -- Optionally specify a liveness probe for the Ignition Gateway container.
+  # livenessProbe:
+
+  # -- Configure the readiness probe configuration details. By default, the readiness probe
+  # will automatically choose the command based on whether redundancy is enabled.
+  readinessProbe:
+    # -- Optionally override the default readiness probe command.
+    commandOverride: []
+    # -- Set the initial delay before probes are issued
+    initialDelaySeconds: 10
+    # -- Set the period between probes
+    periodSeconds: 5
+    # -- Set the number of failures before the pod is considered unready
+    failureThreshold: 2
+    # -- Set the timeout for the readiness probe command
+    timeoutSeconds: 3
+
+  # -- Configure the JVM Heap Memory Percentage (based on memory limit of the container)
+  # Set to 0 to disable percentage based memory allocation.
+  # Additionally define `initialRAMPercentage` to adjust initial heap size, defaults to match the max.
+  maxRAMPercentage: 75
+
+  # -- Array of runtime arguments to pass to the image entrypoint script.
+  # see: https://docs.inductiveautomation.com/docs/8.1/platform/docker-image#runtime-arguments
+  runtimeArgs: []
+
+  # -- Array of JVM args to be passed to Ignition (via wrapper.java.additional_file)
+  # see: https://docs.inductiveautomation.com/docs/8.1/platform/docker-image#supplemental-jvm-and-wrapper-arguments
+  jvmArgs: []
+
+  # -- Map of additional Java Service Wrapper properties.
+  # see: https://wrapper.tanukisoftware.com/doc/english/properties.html
+  wrapperArgs: {}
+
+  # -- Map of Gateway bootstrapping properties
+  # see: https://docs.inductiveautomation.com/docs/8.1/platform/docker-image#gateway-arguments
+  gatewayArgs: {}
+
+  # -- Init Container Configuration for Ignition Gateway
+  preconfigure:
+    # -- Set to true to enable the preconfigure initContainer
+    enabled: true
+    # -- Seed the data volume prior to launch
+    seedDataVolume: true
+    # -- Array of additional "preconfigure" initContainer args to run before the Gateway starts
+    additionalCmds: []
+    # -- Extra raw spec to be added to the "preconfigure" initContainer spec
+    extraSpec: {}
+
+  # -- Additional initContainers to run before the Ignition Gateway container starts
+  initContainers: []
+
+  # -- Public Address Configuration.
+  # Defaults to auto-detect when ingress is enabled.  Use these settings to override.
+  # Use `primaryPublicAddress` and `backupPublicAddress` when redundancy is enabled.
+  publicAddress: {}
+    # -- Public address host address
+    # host: ignition.localtest.me
+    # -- Public address http port, will default to 80 if left unset
+    # http: 80
+    # -- Public address https port, will default to 443 if left unset
+    # https: 443
+    # -- Auto Detect (when true, public address args will be omitted)
+    # autoDetect: false
+
+  # -- External Modules Configuration for dynamic linking of third-party modules
+  externalModules:
+    # -- Set true to enable mounting an external modules PVC and invoking associated entrypoint logic
+    enabled: false
+    # -- Set to true to replace existing modules in the Ignition installation with those from the external modules PVC
+    replaceExistingModules: false
+    # -- Set an explicitly named PVC target for the external modules, defaults to autogeneration based on release name
+    pvcName: ""
+    # -- Define a subpath for the mount point of the external modules PVC within the Ignition container
+    mountSubPath: ""
+    # -- Define a subpath expression for the mount point of the external modules PVC within the Ignition container
+    mountSubPathExpr: ""
+    # -- Defines whether the mount is read-only in the Ignition container, defaults to true
+    mountReadOnly: true
+    # -- Specify createOptions to have Helm create the PVC for you.  Note you'll still have to populate it with
+    # module files--it will be empty upon creation.
+    createOptions: {}
+      # size: 1Gi
+      # accessMode: ReadWriteMany
+      # storageClassName: ""
+      # other: {}
+
+  # -- Environment Variables to be mapped into Ignition container. Can either be in map or list form.
+  # List Form (most flexible):
+  # - name: ACCEPT_IGNITION_EULA
+  #   value: "Y"
+  # Map Form (easier to override with `--set`):
+  #   ACCEPT_IGNITION_EULA: "Y"
+  # Note: you cannot mix and match list and map forms.
+  env:
+
+  # -- Additional environment variables mapped via `envFrom` PodSpec field.
+  envFrom: []
+  # - configMapRef:
+  #     name: foo
+
+  # -- Defines internal port bindings for the gateway. These port definitions are also
+  # targeted by Service resources.  Typically, you'll use an Ingress to expose the gateway
+  # on 80/443, leaving these ports as-is.
+  ports:
+    # -- Unencrypted HTTP Port
+    http: 8088
+    # -- Secure HTTPS Port
+    https: 8043
+    # -- Secure Gateway Network Port
+    gan: 8060
+
+  # -- Defines whether to set resource requests and limits for the Ignition Gateway container
+  # When true, default values of 1-core, 1536GiB RAM are applied, customize them using `resources` value.
+  resourcesEnabled: true
+
+  # -- Defines resource limits/requests for the Ignition Gateway container
+  # This map is applied directly to the `resources` field of the PodSpec.
+  # The commented values are applied as defaults if left unspecified.
+  resources: {}
+    # limits:
+    #   cpu: 1000m
+    #   memory: 1536Mi
+    # requests:
+    #   cpu: 1000m
+    #   memory: 1536Mi
+
+  # -- Gateway Network Configuration
+  gan:
+    # -- Override to use an existing Secret for the metro keystore.  This Secret
+    # should contain a PKCS12 keystore under a `keystore.p12` key.  See cert-manager
+    # integration for more details on certificate automation.
+    existingSecret: ""
+
+    # -- The Secret that contains the metro keystore PKCS12 passphrase.
+    keystoreExistingSecret: ""
+
+    # -- The key under which the keystore passphrase is stored.
+    keystorePasswordKey: "metro-keystore-password"
+
+    # -- Defines a Helm resource policy to attach to the secret.
+    # secretResourcePolicy: keep
+
+    # -- List of outgoing GAN connections to instantiate from this gateway.
+    # Each connection definition needs to have `host` defined at a minimum.
+    outgoingConnections: []
+    # - host: 1.2.3.4
+    #   port: 8060
+    #   description: "For tag server"
+
+    # -- Set to true to require two-way authentication for outgoing GAN connections
+    # requireTwoWayAuth: true
+
+    # -- Set the security policy for incoming GAN connections
+    # Defaults to Unrestricted when full certificate auth is enabled and this value is
+    # left unset; otherwise defaults to ApprovedOnly.
+    # securityPolicy: ApprovedOnly
+
+    # -- White list of incoming GAN connections to allow. Applicable when security policy
+    # is set to `SpecifiedList`.
+    whitelist: []
+    # - ignition-master
+    # - ignition-backup
+
+  # -- Gateway Web Server TLS Configuration
+  tls:
+    # -- Set to true to enable TLS for the Ignition Gateway web server
+    enabled: false
+    # -- Set to name of an existing TLS secret w/ PKCS12 keystore under the key `keystore.p12`.
+    # If left unset, cert-manager integration will be used to generate a certificate.
+    existingSecret: ""
+    # -- The Secret that contains the TLS keystore PKCS12 passphrase.
+    keystoreExistingSecret: ""
+    # -- The key under which the keystore passphrase is stored.
+    keystorePasswordKey: "tls-keystore-password"
+    # -- Defines a Helm resource policy to attach to the secret.
+    # secretResourcePolicy: keep
+
+  # -- Sets the PVC retention policy for when the statefulset is deleted.
+  persistentVolumeClaimRetentionPolicy: Retain
+
+  # -- Override the automatic PVC template spec for the Ignition Gateway data volume.
+  dataVolumeCustomSpec: {}
+
+  # -- Storage size for the Ignition Gateway data volume.
+  dataVolumeStorageSize: 3Gi
+
+  # -- Storage class for the Ignition Gateway data volume.  When unspecified, the default StorageClass will be used.
+  dataVolumeStorageClass: ""
+
+  # -- Additional volumes on the Ignition StatefulSet
+  volumes: []
+
+  # -- Extra Volume Mounts for the Ignition Gateway container.
+  volumeMounts: []
+
+  # -- Extra PVC templates for the Ignition StatefulSet
+  volumeClaimTemplates: []
+
+  # -- Extra Volume Mounts for the Ignition preconfigure container.
+  preconfigureVolumeMounts: []
+
+  # -- Defines the behavior during StatefulSet upgrades.
+  # The default is automatic rolling update, but you can choose to select OnDelete
+  # to give you manual control over when the pods are updated.
+  updateStrategy: {}
+  #  type: OnDelete
+  #  rollingUpdate: null
+
+  # -- Extra raw spec to be added to the "gateway" container spec
+  extraSpec: {}
+
+  # -- Extra containers to be added in addition to "gateway" container
+  extraContainers: []
+
+# -- Defines a custom service account to be used.
+serviceAccount:
+  # Specifies whether a service account should be created.
+  create: true
+  # Automatically mount a ServiceAccount's API credentials?
+  autoMount: true
+  # Annotations to add to the service account.
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template.
+  name: ""
+
+# -- cert-manager integration configuration.
+certManager:
+  # -- Set to true to enable cert-manager integration for the Ignition Gateway GAN and TLS certificates
+  enabled: false
+
+  # -- GAN Issuer Configuration, defines the CA for the Ignition Gateway GAN certificate.
+  # This certificate will be a root trust for incoming GAN connections.
+  ganIssuer:
+    # -- When set, override the auto-generated name for the Issuer and associated CA Certificate.
+    # nameOverride: ignition-gan-issuer
+
+    # -- Set to true to create the Issuer and associated CA Certificate.
+    create: true
+
+    # -- Kind and Group for the GAN issuer, typically Issuer or ClusterIssuer.
+    kind: Issuer
+    group: cert-manager.io
+
+    # -- Spec for the Issuer and associate CA Certificate, applicable if create is true
+    # Values below merge with the default spec
+    spec:
+      # commonNameOverride: ignition-gan-issuer
+      # secretNameOverride: ignition-gan-issuer
+      privateKeyAlgorithm: ECDSA
+      privateKeySize: 256
+      duration: 17520h  # 2 years
+      issuerRefName: selfsigned-issuer
+      issuerRefKind: ClusterIssuer
+      issuerRefGroup: cert-manager.io
+
+    # -- Define if you want to use an explicit custom spec, overriding the merged spec above
+    customSpec: {}
+      # isCA: true
+      # commonName: ignition-gan-issuer
+      # secretName: ignition-gan-issuer
+      # privateKey:
+      #   algorithm: ECDSA
+      #   size: 256
+      # duration: 17520h  # 2 years
+      # issuerRef:
+      #   name: selfsigned-issuer
+      #   kind: ClusterIssuer
+      #   group: cert-manager.io
+
+  # -- GAN Certificate Configuration, defines the client certificate for Ignition
+  # This certificate will be used for outgoing connections to other Ignition gateways.
+  ganCertificate:
+    # -- When set, override the auto-generated name for the Certificate
+    # nameOverride: backend-gan
+
+    # -- Set to true to create the metro keystore certificate and underlying Secret
+    create: true
+
+    # -- Spec for the Certificate, applicable if create is true
+    spec:
+      # commonNameOverride: backend
+      # secretNameOverride: backend-gan
+      dnsNames: []
+        #  - "*.backend"
+      duration: 8760h  # 1 year
+
+    # -- Define if you want to use an explicit custom spec, overriding the merged spec above
+    customSpec: {}
+
+    # -- Set to true to create a CronJob that will rotate a renewed PKCS12 keystore (from the secret)
+    # into the gateway container.
+    rotationEnabled: false
+
+    # -- Configure the frequency for cert rotation, defaults to once a day at 7am.
+    rotationFrequency: "0 7 * * *"
+
+  # -- TLS Issuer Configuration, defines the CA for the Ignition Gateway TLS certificate.
+  # This is only active when `gateway.tls.enabled` is `true`
+  tlsIssuer:
+    # -- When set, override the auto-generated name for the Issuer and associated CA Certificate
+    # nameOverride: ignition-tls-issuer
+
+    # -- Set to true to create the Issuer and associated CA Certificate
+    create: true
+
+    # -- Kind and Group for the TLS issuer, typically Issuer or ClusterIssuer
+    kind: Issuer
+    group: cert-manager.io
+
+    # -- Spec for the Issuer and associate CA Certificate, applicable if create is true
+    # Values below merge with the default spec
+    spec:
+      # commonNameOverride: ignition-tls-issuer
+      # secretNameOverride: ignition-tls-issuer
+      privateKeyAlgorithm: ECDSA
+      privateKeySize: 256
+      duration: 17520h  # 2 years
+      issuerRefName: selfsigned-issuer
+      issuerRefKind: ClusterIssuer
+      issuerRefGroup: cert-manager.io
+
+    # -- Define if you want to use an explicit custom spec, overriding the merged spec above
+    customSpec: {}
+      # isCA: true
+      # commonName: ignition-tls-issuer
+      # secretName: ignition-tls-issuer
+      # privateKey:
+      #   algorithm: ECDSA
+      #   size: 256
+      # duration: 17520h  # 2 years
+      # issuerRef:
+      #   name: selfsigned-issuer
+      #   kind: ClusterIssuer
+      #   group: cert-manager.io
+
+  # -- TLS Certificate Configuration, defines the web server certificate for Ignition
+  # This is only active when `gateway.tls.enabled` is `true`
+  tlsCertificate:
+    # -- When set, override the auto-generated name for the Certificate
+    # nameOverride: backend-tls
+
+    # -- Set to true to create the Certificate
+    create: true
+
+    # -- Spec for the Certificate, applicable if create is true
+    # Values below merge with the default spec
+    spec:
+      # commonNameOverride: ignition-tls
+      # secretNameOverride: ignition-tls
+      dnsNames: []
+        #  - "*.ignition"
+      duration: 8760h  # 1 year
+      privateKeyAlgorithm: RSA
+      privateKeySize: 2048
+
+    # -- Define if you want to use an explicit custom spec, overriding the merged spec above
+    customSpec: {}
+
+    # -- Set to true to create a CronJob that will rotate a renewed PKCS12 keystore (from the secret)
+    # into the gateway container.
+    rotationEnabled: false
+
+    # -- Configure the frequency for cert rotation, defaults to once a day at 7am.
+    rotationFrequency: "0 7 * * *"
+
+# -- Service configuration
+service:
+  # -- Service type, defaults to `ClusterIP` for use with Ingress.
+  # Can be set to `LoadBalancer` for direct access or `NodePort` for testing.
+  type: ClusterIP
+
+  # -- Additional annotations to apply to Service objects.
+  # Use `primaryAnnotations` and `backupAnnotations` to apply redundancy-role-specific
+  # service annotations.
+  annotations: {}
+
+  # -- Load Balancer configuration, when `type` is `LoadBalancer`
+  # Use `primaryLoadBalancerPorts` and `backupLoadBalancerPorts` to apply redundancy-role-specific
+  # port settings.
+  loadBalancerPorts: {}
+    # http: 8089
+    # https: 8044
+    # gan: 8061
+
+  # -- Load Balancer Source Ranges, when `type` is `LoadBalancer`
+  loadBalancerSourceRanges: []
+
+  # -- Node Port configuration, when `type` is `NodePort`
+  # Use `primaryNodePorts` and `backupNodePorts` to apply redundancy-role-specific settings.
+  nodePorts: {}
+
+  # -- Custom Port Configuration, overrides automatic port definitions
+  # Use `primaryCustomPorts` and `backupCustomPorts` to apply redundancy-role-specific settings.
+  customPorts: []
+
+  # -- Extra ServiceSpec fields to apply to the Service objects.
+  # Use `primaryExtraSpec` and `backupExtraSpec` to apply redundancy-role-specific spec settings.
+  extraSpec: {}
+
+  # -- For replicas > 0 (and redundancy disabled), this will create a set of dedicated services with selectors by-pod-index.
+  podIndexedServices:
+    # -- Set to true to create pod-indexed services.
+    create: false
+    # -- Extra annotations to apply to the pod-indexed services
+    annotations: {}
+    # -- Extra Service spec fields to apply to the pod-indexed services
+    extraSpec: {}
+
+# -- Ingress configuration
+ingress:
+  # -- Set to true to enable Ingress resource creation
+  enabled: true
+
+  # -- Specify an IngressClass to use, if not set, the default class will be used
+  className: ""
+
+  # -- Annotations to apply to the Ingress resource, consult your Ingress Controller
+  # Use `primaryAnnotations` and `backupAnnotations` when redundancy is enabled.
+  annotations: {}
+    # traefik.ingress.kubernetes.io/router.entrypoints: web
+
+  # -- Domain suffix for Ingress resource hostnames.
+  domainSuffix: localtest.me
+
+  # -- Specify an explicit FQDN to use for the Ingress resource
+  # Use `primaryHostOverride` and `backupHostOverride` when redundancy is enabled.
+  # Set to `*` to omit the host field.
+  # hostOverride: foo.example.com
+
+  # -- TLS Configuration for Ingress
+  tls:
+    # -- Set to true to enable TLS for the Ingress resource
+    enabled: false
+
+  # -- List of custom rules to manually apply to the Ingress rules with no dynamic generation
+  # Use `primaryCustomRules` and `backupCustomRules` when redundancy is enabled.
+  customRules: []
+  # - host: foo.example.com
+  #   paths:
+  #     - path: /
+  #       pathType: ImplementationSpecific
+
+  # -- List of extra rules to append to the generated rules within Ingress.
+  # Applicable only when `customRules` is not defined.
+  # Use `primaryExtraRules` and `backupExtraRules` when redundancy is enabled.
+  extraRules: []
+
+  # -- List of custom TLS configurations to manually apply to the Ingress TLS section
+  # Use `primaryCustomTLS` and `backupCustomTLS` when redundancy is enabled.
+  customTLS: []
+  # - secretName: ignition-web
+  #   hosts:
+  #     - foo.example.com
+
+  # -- For replicas > 0 (and redundancy disabled), this will create a set of pod-indexed Ingress rules for each replica.
+  # This requires `service.podIndexedServices.create` to be set true.
+  podIndexedIngressRules:
+    # -- Set to true to create pod-indexed Ingress rules.
+    create: false
+    # -- Suffix delimiter to use for appending an integer index to the first component of the hostname
+    suffixDelimiter: "-"
+
+# -- Defines the pod security context for the entire Ignition pod.
+# Default is UID/GID 2003 for container execution and volume ownership, enforcing non-root.
+podSecurityContext: {}
+
+# -- Defines extra annotations to apply to the Ignition pod.
+podAnnotations: {}
+
+# -- Defines extra labels to apply to the Ignition pod.
+podLabels: {}
+
+# -- Should pods be scheduled to different nodes?  Set to true for redundancy.
+podAntiAffinity: false
+
+# -- Extra pod spec fields to apply to the Ignition pod.
+podExtraSpec: {}
+
+# -- Defines the scheduling affinity for the pod.
+affinity: {}
+
+# -- Defines the labels you want a node to have the pod scheduled to.
+nodeSelector: {}
+
+# -- Defines tolerations to match up with applied node taints.
+tolerations: []
+
+# -- Override the default naming prefix.  There will still be some naming
+# logic applied based on whether this name ends in the name of the chart.
+nameOverride: ""
+
+# -- Full override of the naming prefix.  Use this if you want to explicitly
+# control the naming prefix of all resources created by the chart.
+fullnameOverride: ""
+
+# -- Array of extra arbitrary objects to apply alongside this release.  You can use templating
+# within these definitions that will get applied when rendered.
+extraObjects: []
+# - |
+#   apiVersion: v1
+#   kind: ConfigMap
+#   metadata:
+#     name: {{ include "ignition.fullname" . }}-other-config
+#   data:
+#     foo: YmFy

@@ -1,0 +1,47 @@
+suite: ExtraObjects Tests
+release:
+  name: ignition
+  namespace: ignition-test
+templates:
+- extraobjects.yaml
+set:
+  # Ensure that templating is working correctly
+  extraObjects:
+  - |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: {{ include "ignition.fullname" . }}-other-config
+    data:
+      foo: bar
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: '{{ include "ignition.fullname" . }}-other-config'
+    data:
+      bar: baz
+tests:
+- it: Validate Extra Objects Creation
+  asserts:
+  - hasDocuments:
+      count: 2
+- it: Validate Extra Object ConfigMap from String form
+  documentIndex: 0
+  asserts:
+  - containsDocument:
+      kind: ConfigMap
+      apiVersion: v1
+      name: ignition-other-config
+  - equal:
+      path: data.foo
+      value: bar
+- it: Validate Extra Object ConfigMap from Object form
+  documentIndex: 1
+  asserts:
+  - containsDocument:
+      kind: ConfigMap
+      apiVersion: v1
+      name: ignition-other-config
+  - equal:
+      path: data.bar
+      value: baz

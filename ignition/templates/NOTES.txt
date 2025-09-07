@@ -1,0 +1,29 @@
+
+🎉 Thank you for installing Ignition {{ (empty .Values.image.tag) | ternary .Chart.AppVersion .Values.image.tag }} by Inductive Automation!
+
+{{- $phrase := .Values.gateway.redundancy.enabled | ternary "Gateways are" "" }}
+{{- $phrase = (and (empty $phrase) (gt ((include "ignition.gateway.replicas" .) | int) 1)) | ternary "Gateways are" $phrase }}
+{{- $phrase = empty $phrase | ternary "Gateway is" $phrase }}
+
+{{- if .Values.ingress.enabled }}
+
+🚀 Ignition {{ $phrase }} reachable at:
+  {{- $protocol := printf "http%s" ($.Values.ingress.tls.enabled | ternary "s" "") }}
+  {{- range $redundancyMode := (.Values.gateway.redundancy.enabled | ternary (list "primary" "backup") (list "")) }}
+  - {{ $protocol }}://{{ include "ignition.ingress.hostName" (list $ $redundancyMode) }}
+  {{- end }}
+  {{- range $podIndex := until ((include "ignition.ingress.podIndexedHostNameCount" .) | int) }}
+  - {{ $protocol }}://{{ include "ignition.ingress.podIndexedHostName" (list $ $podIndex) }}
+  {{- end}}
+{{- end }}
+
+{{- if eq .Release.Revision 1 }}
+{{- $secretName := include "ignition.gateway.gatewayAdminSecret" . }}
+{{- $secretKeyQuoted := (.Values.commissioning.auth.adminPasswordKey | quote) }}
+
+🔐 The initial Ignition Gateway `{{ .Values.commissioning.auth.adminUsername }}` password can be retrieved with:
+
+  kubectl get secret -n {{ .Release.Namespace }} {{ $secretName }} --template='{{ "{{" }} printf "%s\n" (index .data {{ $secretKeyQuoted }} | base64decode) }}'
+{{- end }}
+
+To learn more about Ignition, please visit our website at https://inductiveautomation.com

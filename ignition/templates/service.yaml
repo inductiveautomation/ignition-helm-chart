@@ -1,0 +1,73 @@
+{{- $serviceType := "Pending" -}}
+{{- range $suffix := (.Values.gateway.redundancy.enabled | ternary (list "primary" "backup" "") (list "")) }}
+{{- if empty $suffix | and $.Values.gateway.redundancy.enabled }}
+{{- $serviceType = "ClusterIP" }}
+{{- else }}
+{{- $serviceType = $.Values.service.type | default "ClusterIP" }}
+{{- end }}
+{{- with $ }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ignition.service.serviceName" (dict "context" . "suffix" $suffix) }}
+  labels:
+    {{- include "ignition.labels" . | nindent 4 }}
+  {{- $baseAnnotations := .Values.service.annotations | default dict -}}
+  {{- $annotations := (get .Values.service (empty $suffix | ternary "annotations" (printf "%sAnnotations" $suffix))) | default dict -}}
+  {{- $annotations = merge $annotations $baseAnnotations -}}
+  {{- with $annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- $baseExtraSpec := .Values.service.extraSpec | default dict -}}
+  {{- $extraSpec := (get .Values.service (empty $suffix | ternary "extraSpec" (printf "%sExtraSpec" $suffix ))) | default dict -}}
+  {{- $extraSpec = merge $extraSpec $baseExtraSpec -}}
+  {{- with $extraSpec }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
+  selector:
+    {{- include "ignition.selectorLabels" . | nindent 4 }}
+    {{- with $suffix }}
+    apps.kubernetes.io/pod-index: {{ eq $suffix "primary" | ternary "0" "1" | quote }}
+    {{- end }}
+  ports: {{- include "ignition.gateway.servicePorts" (list . $suffix $serviceType) | indent 2 }}
+  type: {{ $serviceType }}
+  {{- if $serviceType | eq "ClusterIP" }}
+  clusterIP: None
+  {{- else }}
+  clusterIP: ""
+  {{- end }}
+  {{- if $serviceType | eq "LoadBalancer" }}
+  {{- with .Values.service.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
+---
+{{- end }}
+{{- end }}
+{{/* Optionally create pod-indexed Service Resources */}}
+{{- range $i := until ((include "ignition.service.podIndexedServiceCount" .) | int) }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ignition.service.serviceName" (dict "context" $ "suffix" ($i | toString)) }}
+  labels:
+    {{- include "ignition.labels" $ | nindent 4 }}
+  {{- with $.Values.service.podIndexedServices.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with $.Values.service.podIndexedServices.extraSpec }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
+  selector:
+    {{- include "ignition.selectorLabels" $ | nindent 4 }}
+    apps.kubernetes.io/pod-index: {{ $i | quote }}
+  ports: {{- include "ignition.gateway.servicePorts" (list $ "" "ClusterIP") | indent 2 }}
+  type: ClusterIP
+  clusterIP: None
+---
+{{- end }}

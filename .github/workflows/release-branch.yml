@@ -1,0 +1,69 @@
+name: Release Branch Testing
+
+on:
+  push:
+    branches:
+      - 'release/[0-9]+.[0-9]+.[0-9]+'
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CT_CHART_DIRS: "."
+
+jobs:
+  lint-and-unittest:
+    name: Lint Chart and Run Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # ct needs full history to detect changed charts
+
+      - name: Install helm-unittest plugin
+        run: |
+          helm plugin install https://github.com/helm-unittest/helm-unittest --version v1.0.0
+          helm plugin list
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@v2
+
+      - name: helm-unittest (all changed charts)
+        run: |
+          helm unittest ignition
+
+      - name: ct lint
+        run: |
+          ct lint --all
+
+  # TODO: re-enable once repo is public and GH actions runners have more resources
+  # functional-tests:
+  #   name: Functional Tests using Kind (K8s ${{ matrix.k8s }})
+  #   runs-on: ubuntu-latest
+  #   needs: lint-and-unittest
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       k8s:
+  #         - v1.29.4
+  #         - v1.33.2
+
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v5
+
+  #     - name: Set up chart-testing
+  #       uses: helm/chart-testing-action@v2
+
+  #     - name: Create kind cluster (${{ matrix.k8s }})
+  #       uses: helm/kind-action@v1
+  #       with:
+  #         node_image: kindest/node:${{ matrix.k8s }}
+  #         wait: 120s
+  #         cluster_name: ct-${{ matrix.k8s }}
+
+  #     - name: Test Charts
+  #       run: |
+  #         ct install --all

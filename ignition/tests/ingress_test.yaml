@@ -1,0 +1,233 @@
+x-custom-rules: &custom-rules
+- &custom-rule-1
+  http:
+    paths:
+    - path: /
+      pathType: Prefix
+      backend:
+        service:
+          name: ignition
+          port:
+            name: http
+  host: "foo.localtest.me"
+- &custom-rule-2
+  http:
+    paths:
+    - path: /
+      pathType: Prefix
+      backend:
+        service:
+          name: ignition
+          port:
+            name: http
+  host: "bar.localtest.me"
+  
+x-custom-tls: &custom-tls
+- &custom-tls-1
+  secretName: "foo-tls"
+  hosts:
+  - "foo.localtest.me"
+- &custom-tls-2
+  secretName: "bar-tls"
+  hosts:
+  - "bar.localtest.me"
+
+suite: Ingress Tests
+release:
+  name: ignition
+  namespace: ignition-test
+templates:
+- ingress.yaml
+tests:
+# General Ingress Tests
+- it: Renders Ingress
+  asserts:
+  - containsDocument:
+      kind: Ingress
+      apiVersion: networking.k8s.io/v1
+      name: ignition
+# Check that single rule is created by default
+- it: Validate Single Rule by Default
+  asserts:
+  - lengthEqual:
+      path: spec.rules
+      count: 1
+- it: Validate Pod-Indexed Ingress Rule Count
+  set:
+    gateway.replicas: 2
+    service.podIndexedServices.create: true
+    ingress.podIndexedIngressRules.create: true
+  asserts:
+  - lengthEqual:
+      path: spec.rules
+      count: 3
+  - equal:
+      path: spec.rules[0].host
+      value: "ignition.localtest.me"
+  - equal:
+      path: spec.rules[1].host
+      value: "ignition-0.localtest.me"
+  - equal:
+      path: spec.rules[2].host
+      value: "ignition-1.localtest.me"
+# Validate Ingress Annotations
+- it: Validate Ingress Annotations
+  set:
+    ingress.annotations:
+      traefik.ingress.kubernetes.io/router.entrypoints: web
+  asserts:
+  - isSubset:
+      path: metadata.annotations
+      content:
+        traefik.ingress.kubernetes.io/router.entrypoints: web
+# Validate Ingress TLS Configuration
+- it: Validate Ingress TLS Configuration
+  set:
+    ingress.tls.enabled: true
+    ingress.tls.secretName: ignition-tls
+  asserts:
+  - lengthEqual:
+      path: spec.tls
+      count: 1
+  - isSubset:
+      path: spec.tls[0]
+      content:
+        secretName: ignition-tls
+        hosts:
+        - "ignition.localtest.me"
+- it: Validate Custom TLS Configuration
+  set:
+    ingress.tls.enabled: true
+    ingress.customTLS:
+    - secretName: "foo-tls"
+      hosts:
+      - "foo.localtest.me"
+    - secretName: "bar-tls"
+      hosts:
+      - "bar.localtest.me"
+  asserts:
+  - lengthEqual:
+      path: spec.tls
+      count: 2
+  - equal:
+      path: spec.tls[1].secretName
+      value: "bar-tls"
+# Custom/Extra Rule Tests
+- it: Validate Custom Rules
+  set:
+    ingress.customRules: *custom-rules
+  asserts:
+  - lengthEqual:
+      path: spec.rules
+      count: 2
+  - contains:
+      path: spec.rules
+      content: *custom-rule-1
+  - contains:
+      path: spec.rules
+      content: *custom-rule-2
+- it: Validate Extra Rules
+  set:
+    ingress.extraRules: *custom-rules
+  asserts:
+  - lengthEqual:
+      path: spec.rules
+      count: 3
+  - contains:
+      path: spec.rules
+      content: *custom-rule-1
+  - contains:
+      path: spec.rules
+      content: *custom-rule-2
+# Redundancy Tests
+- it: Validate Base Redundancy with Ingress
+  set:
+    gateway.redundancy.enabled: true
+  asserts:
+  - hasDocuments:
+      count: 2
+  - equal:
+      path: metadata.name
+      value: ignition-primary
+    documentIndex: 0
+  - equal:
+      path: spec.rules[0].http.paths[0].backend.service.name
+      value: ignition-primary
+    documentIndex: 0
+  - equal:
+      path: metadata.name
+      value: ignition-backup
+    documentIndex: 1
+  - equal:
+      path: spec.rules[0].http.paths[0].backend.service.name
+      value: ignition-backup
+    documentIndex: 1
+- it: Validate Redundancy with Custom TLS
+  set:
+    gateway.redundancy.enabled: true
+    ingress.tls.enabled: true
+    ingress.customTLS: *custom-tls
+  asserts:
+  - lengthEqual:
+      path: spec.tls
+      count: 2
+- it: Validate Redundancy with Custom TLS with Primary Override
+  set:
+    gateway.redundancy.enabled: true
+    ingress.customTLS: *custom-tls
+    ingress.primaryCustomTLS:
+    - *custom-tls-1
+  asserts:
+  - lengthEqual:
+      path: spec.tls
+      count: 1
+    documentIndex: 0
+  - lengthEqual:
+      path: spec.tls
+      count: 2
+    documentIndex: 1
+- it: Validate Redundancy with Custom TLS with Backup Override
+  set:
+    gateway.redundancy.enabled: true
+    ingress.customTLS: *custom-tls
+    ingress.backupCustomTLS:
+    - *custom-tls-1
+  asserts:
+  - lengthEqual:
+      path: spec.tls
+      count: 1
+    documentIndex: 1
+  - lengthEqual:
+      path: spec.tls
+      count: 2
+    documentIndex: 0
+- it: Validate Redundancy with Extra Rules with Primary Override
+  set:
+    gateway.redundancy.enabled: true
+    ingress.customRules: *custom-rules
+    ingress.primaryCustomRules:
+    - *custom-rule-1
+  asserts:
+  - lengthEqual:
+      path: spec.rules
+      count: 1
+    documentIndex: 0
+  - lengthEqual:
+      path: spec.rules
+      count: 2
+    documentIndex: 1
+- it: Validate Redundancy with Extra Rules with Backup Override
+  set:
+    gateway.redundancy.enabled: true
+    ingress.customRules: *custom-rules
+    ingress.backupCustomRules:
+    - *custom-rule-1
+  asserts:
+  - lengthEqual:
+      path: spec.rules
+      count: 1
+    documentIndex: 1
+  - lengthEqual:
+      path: spec.rules
+      count: 2
+    documentIndex: 0

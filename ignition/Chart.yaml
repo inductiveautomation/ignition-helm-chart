@@ -1,0 +1,16 @@
+apiVersion: v2
+name: ignition
+description: Ignition by Inductive Automation
+type: application
+version: 0.1.0
+appVersion: "8.1.49"
+kubeVersion: ">= 1.29.0-0"
+home: https://www.inductiveautomation.com
+maintainers:
+- name: thirdgen88
+  email: kcollins@inductiveautomation.com
+icon: https://docs.inductiveautomation.com/img/Logo-Ignition-Check.svg
+sources:
+- https://github.com/inductiveautomation/ignition-helm-chart
+annotations:
+  charts.openshift.io/name: Ignition by Inductive Automation

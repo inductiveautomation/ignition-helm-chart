@@ -1,0 +1,4 @@
+commissioning:
+  edition: standard
+  acceptIgnitionEULA: true
+  disableQuickstart: true

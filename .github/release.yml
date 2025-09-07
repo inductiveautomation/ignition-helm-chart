@@ -1,0 +1,21 @@
+# Github Release Notes Configuration
+# ref: https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes
+---
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+  categories:
+    - title: Fixed 🛠
+      labels:
+        - fix
+        - regression
+    - title: Added 🎉
+      labels:
+        - feature
+    - title: Changed 📝
+      labels:
+        - "changed"
+    - title: Other ⚙️
+      labels:
+        - "*"

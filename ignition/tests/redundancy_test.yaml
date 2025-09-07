@@ -1,0 +1,61 @@
+suite: Redundancy Tests
+release:
+  name: ignition
+  namespace: ignition-test
+templates:
+- statefulset.yaml
+- configmap.yaml
+tests:
+# Redundancy tests
+- it: Check redundancy disabled by default
+  template: statefulset.yaml
+  asserts:
+  - equal:
+      path: spec.replicas
+      value: 1
+- it: Check redundancy enabled
+  template: statefulset.yaml
+  set:
+    gateway.redundancy.enabled: true
+  asserts:
+  - equal:
+      path: spec.replicas
+      value: 2
+  - contains:
+      path: spec.template.spec.initContainers[0].env
+      content:
+        name: GATEWAY_PUBLIC_ADDRESS_BACKUP
+        value: "ignition-backup.localtest.me"
+  - contains:
+      path: spec.template.spec.initContainers[0].env
+      content:
+        name: GATEWAY_PUBLIC_ADDRESS_PRIMARY
+        value: "ignition-primary.localtest.me"
+  - contains:
+      path: spec.template.spec.initContainers[0].env
+      content:
+        name: GATEWAY_PUBLIC_HTTPS_PORT_BACKUP
+        value: "443"
+  - contains:
+      path: spec.template.spec.initContainers[0].env
+      content:
+        name: GATEWAY_PUBLIC_HTTPS_PORT_PRIMARY
+        value: "443"
+  - contains:
+      path: spec.template.spec.initContainers[0].env
+      content:
+        name: GATEWAY_PUBLIC_HTTP_PORT_BACKUP
+        value: "80"
+  - contains:
+      path: spec.template.spec.initContainers[0].env
+      content:
+        name: GATEWAY_PUBLIC_HTTP_PORT_PRIMARY
+        value: "80"
+- it: Check redundancy enabled with ingress disabled
+  template: statefulset.yaml
+  set:
+    gateway.redundancy.enabled: true
+    ingress.enabled: false
+  asserts:
+  - notExists:
+      path: spec.template.spec.initContainers[0].env
