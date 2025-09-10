@@ -23,6 +23,10 @@ commissioning:
   acceptIgnitionEULA: false
   # -- When true, disable the quickstart project prompts on first launch
   disableQuickstart: false
+  # -- Array of module identifiers for which to auto-accept the EULAs
+  acceptModuleLicenses: []
+  # -- Array of module identifiers for which to auto-accept the certificates
+  acceptModuleCertificates: []
   # -- Initial Gateway Admin Configuration
   auth:
     # -- Defines the initial gateway admin username

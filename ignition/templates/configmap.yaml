@@ -13,6 +13,12 @@ data:
 {{- if $.Values.commissioning.disableQuickstart }}
   DISABLE_QUICKSTART: "true"
 {{- end }}
+{{- with .Values.commissioning.acceptModuleLicenses }}
+  ACCEPT_MODULE_LICENSES: {{ include "ignition.renderCommaDelimitedArray" . | quote }}
+{{- end }}
+{{- with .Values.commissioning.acceptModuleCertificates }}
+  ACCEPT_MODULE_CERTS: {{ include "ignition.renderCommaDelimitedArray" . | quote }}
+{{- end }}
 {{- with .Values.commissioning.auth.adminUsername }}
   {{- if not (eq . "admin") }}
   GATEWAY_ADMIN_USERNAME: {{ . | quote }}
@@ -34,8 +40,8 @@ data:
   {{- end }}
 {{- end }}
 {{- if (and .Values.gateway.redundancy.enabled (hasKey .Values.gateway.licensing "primaryLeasedActivation") (hasKey .Values.gateway.licensing "backupLeasedActivation")) }}
-  IGNITION_LICENSE_KEY_FILE: data/local/.ignition-license-key
-  IGNITION_ACTIVATION_TOKEN_FILE: data/local/.ignition-activation-token
+  IGNITION_LICENSE_KEY_FILE: data/config/local/ignition/.ignition-license-key
+  IGNITION_ACTIVATION_TOKEN_FILE: data/config/local/ignition/.ignition-activation-token
 {{- else if .Values.gateway.licensing.leasedActivation }}
   IGNITION_LICENSE_KEY_FILE: /run/secrets/ignition/ignition-license-key
   IGNITION_ACTIVATION_TOKEN_FILE: /run/secrets/ignition/ignition-activation-token

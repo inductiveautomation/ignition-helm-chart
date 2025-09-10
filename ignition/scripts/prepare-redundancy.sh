@@ -126,9 +126,9 @@ function prepareRedundancyLicensing() {
 
   # if there is a secret at /run/secrets/ignition-license-key, link it
   info "Linking license key for ${REDUNDANCY_ROLE,,} redundancy role"
-  ln -sf "/run/secrets/ignition/${REDUNDANCY_ROLE,,}-ignition-license-key" "${IGNITION_DATA_DIR}/local/.ignition-license-key"
+  ln -sf "/run/secrets/ignition/${REDUNDANCY_ROLE,,}-ignition-license-key" "${IGNITION_DATA_DIR}/config/local/ignition/.ignition-license-key"
   info "Linking activation token for ${REDUNDANCY_ROLE,,} redundancy role"
-  ln -sf "/run/secrets/ignition/${REDUNDANCY_ROLE,,}-ignition-activation-token" "${IGNITION_DATA_DIR}/local/.ignition-activation-token"
+  ln -sf "/run/secrets/ignition/${REDUNDANCY_ROLE,,}-ignition-activation-token" "${IGNITION_DATA_DIR}/config/local/ignition/.ignition-activation-token"
 }
 
 ###############################################################################

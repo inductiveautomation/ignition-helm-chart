@@ -32,8 +32,8 @@ function main() {
 function populateGanKeystore() {
   local existing_alias
   local target_alias
-  local keystore_parent_path="${IGNITION_DATA_DIR}/local"
-  local keystore_path="${keystore_parent_path}/metro-keystore"
+  local keystore_parent_path="${IGNITION_DATA_DIR}/config/local/ignition/gateway-network/keystore"
+  local keystore_path="${keystore_parent_path}/metro-keystore.pfx"
 
   info "Populating GAN Client Keystore -> ${keystore_path}"
 
@@ -58,10 +58,10 @@ function populateGanCaCertificate() {
   info "Populating GAN CA Certificate into Ignition gateway network trusted certs folders"
 
   # Copy the GAN Issuer CA certificate to trusted certs for server/client to establish root trust
-  mkdir -v -p "${IGNITION_DATA_DIR}/gateway-network/server/security/pki/trusted/certs/"
-  mkdir -v -p "${IGNITION_DATA_DIR}/gateway-network/client/security/pki/trusted/certs/"
-  cp -v "${GAN_CA_SECRETS_DIR}/tls.crt" "${IGNITION_DATA_DIR}/gateway-network/server/security/pki/trusted/certs/ignition-gan-ca.crt"
-  cp -v "${GAN_CA_SECRETS_DIR}/tls.crt" "${IGNITION_DATA_DIR}/gateway-network/client/security/pki/trusted/certs/ignition-gan-ca.crt"
+  mkdir -v -p "${IGNITION_DATA_DIR}/config/local/ignition/gateway-network/server/security/pki/trusted/certs/"
+  mkdir -v -p "${IGNITION_DATA_DIR}/config/local/ignition/gateway-network/client/security/pki/trusted/certs/"
+  cp -v "${GAN_CA_SECRETS_DIR}/tls.crt" "${IGNITION_DATA_DIR}/config/local/ignition/gateway-network/server/security/pki/trusted/certs/ignition-gan-ca.crt"
+  cp -v "${GAN_CA_SECRETS_DIR}/tls.crt" "${IGNITION_DATA_DIR}/config/local/ignition/gateway-network/client/security/pki/trusted/certs/ignition-gan-ca.crt"
 }
 
 ###############################################################################
@@ -72,8 +72,8 @@ function updateGwbk() {
 
   # Target destination paths for the GAN CA certificate
   local dest_locations=( 
-    "gateway-network/server/security/pki/trusted/certs/ignition-gan-ca.crt"
-    "gateway-network/client/security/pki/trusted/certs/ignition-gan-ca.crt"
+    "config/local/ignition/gateway-network/server/security/pki/trusted/certs/ignition-gan-ca.crt"
+    "config/local/ignition/gateway-network/client/security/pki/trusted/certs/ignition-gan-ca.crt"
   )
 
   # Remove existing files in destination location (if present)

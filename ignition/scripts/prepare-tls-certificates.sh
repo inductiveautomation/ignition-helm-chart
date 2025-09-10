@@ -22,7 +22,7 @@ function main() {
 function populateWebKeystore() {
   local existing_alias
   local target_alias
-  local keystore_parent_path="${IGNITION_DATA_DIR}/local"
+  local keystore_parent_path="${IGNITION_DATA_DIR}/config/local/ignition/webserver/keystore"
   local keystore_path="${keystore_parent_path}/ssl.pfx"
 
   info "Populating Web Server TLS Keystore -> ${keystore_path}"
