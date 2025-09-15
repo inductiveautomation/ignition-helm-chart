@@ -237,3 +237,24 @@ tests:
   - contains:
       path: spec.template.spec.initContainers[0].args
       content: '/config/scripts/prepare-redundancy.sh -g "ignition-gateway-0.ignition" -k -v'
+# Validate EmptyDir Data Volume
+- it: Validate Presence of Volume Claim Template by default
+  template: statefulset.yaml
+  asserts:
+  - lengthEqual:
+      path: spec.volumeClaimTemplates
+      count: 1
+- it: Validate No Volume Claim Template and EmptyDir Volume when enabled
+  template: statefulset.yaml
+  set:
+    gateway.dataVolumeUseEmptyDir: true
+  asserts:
+  - lengthEqual:
+      path: spec.volumeClaimTemplates
+      count: 0
+  - contains:
+      path: spec.template.spec.volumes
+      content:
+        name: data
+        emptyDir:
+          sizeLimit: "3Gi"

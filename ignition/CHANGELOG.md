@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added `commissioning.acceptModuleLicenses` and `commissioning.acceptModuleCertificates` arrays for auto-acceptance of third-party module EULA and certificates, new with Ignition 8.3.0.
 - Added `gateway.deploymentMode` to allow specifying Ignition deployment mode without needing to supply the raw JVM arg directly.
+- Added `gateway.dataVolumeUseEmptyDir` to allow using an ephemeral emptyDir volume for the Ignition data volume instead of a PVC.  The size limit for the ephemeral volume will be applied from `gateway.dataVolumeStorageSize`.
 
 ### Fixed
 

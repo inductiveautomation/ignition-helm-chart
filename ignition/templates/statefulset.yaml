@@ -251,6 +251,11 @@ spec:
       {{- toYaml . | nindent 6 }}
       {{- end }}
       volumes:
+      {{- if .Values.gateway.dataVolumeUseEmptyDir }}
+      - name: data
+        emptyDir:
+          sizeLimit: {{ .Values.gateway.dataVolumeStorageSize | quote }}
+      {{- end }}
       {{- if .Values.gateway.externalModules.enabled }}
       {{- with .Values.gateway.externalModules }}
       - name: external-modules
@@ -349,6 +354,7 @@ spec:
     whenDeleted: {{ .Values.gateway.persistentVolumeClaimRetentionPolicy }}
     whenScaled: Retain
   volumeClaimTemplates:
+  {{- if not .Values.gateway.dataVolumeUseEmptyDir }}
   - metadata:
       name: data
     spec:
@@ -363,6 +369,7 @@ spec:
         requests:
           storage: {{ .Values.gateway.dataVolumeStorageSize | default "3Gi"}}
     {{- end }}
+  {{- end }}
   {{- with .Values.gateway.volumeClaimTemplates -}}
     {{- . | toYaml | nindent 2 }}
   {{- end }}
