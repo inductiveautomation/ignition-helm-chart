@@ -498,7 +498,6 @@ ingress:
   className: ""
 
   # -- Annotations to apply to the Ingress resource, consult your Ingress Controller
-  # Use `primaryAnnotations` and `backupAnnotations` when redundancy is enabled.
   annotations: {}
     # traefik.ingress.kubernetes.io/router.entrypoints: web
 
@@ -525,11 +524,9 @@ ingress:
 
   # -- List of extra rules to append to the generated rules within Ingress.
   # Applicable only when `customRules` is not defined.
-  # Use `primaryExtraRules` and `backupExtraRules` when redundancy is enabled.
   extraRules: []
 
   # -- List of custom TLS configurations to manually apply to the Ingress TLS section
-  # Use `primaryCustomTLS` and `backupCustomTLS` when redundancy is enabled.
   customTLS: []
   # - secretName: ignition-web
   #   hosts:

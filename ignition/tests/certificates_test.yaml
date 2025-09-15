@@ -1,0 +1,108 @@
+suite: Certificate Tests
+release:
+  name: ignition
+  namespace: ignition-test
+templates:
+- certificates.yaml
+- issuer.yaml
+tests:
+# General Certificate Tests
+- it: No Certificate Rendered by Default
+  asserts:
+  - hasDocuments:
+      count: 0
+- it: GAN Certificates only enabled with certManager enablement
+  set:
+    certManager.enabled: true
+  asserts:
+  - containsDocument:
+      kind: Certificate
+      apiVersion: cert-manager.io/v1
+      name: ignition-tls
+      template: certificates.yaml
+    not: true
+  - containsDocument:
+      kind: Issuer
+      apiVersion: cert-manager.io/v1
+      name: ignition-gan-issuer
+    template: issuer.yaml
+  - containsDocument:
+      kind: Certificate
+      apiVersion: cert-manager.io/v1
+      name: ignition-gan-issuer
+    template: certificates.yaml
+    documentIndex: 0
+  - containsDocument:
+      kind: Certificate
+      apiVersion: cert-manager.io/v1
+      name: ignition-gan
+    template: certificates.yaml
+    documentIndex: 1
+- it: TLS and GAN Certificates with certManager and gateway TLS
+  set:
+    certManager.enabled: true
+    gateway.tls.enabled: true
+  asserts:
+  - hasDocuments:
+      count: 4
+    template: certificates.yaml
+  - containsDocument:
+      kind: Certificate
+      apiVersion: cert-manager.io/v1
+      name: ignition-tls-issuer
+    template: certificates.yaml
+    documentIndex: 0
+  - containsDocument:
+      kind: Certificate
+      apiVersion: cert-manager.io/v1
+      name: ignition-gan-issuer
+    template: certificates.yaml
+    documentIndex: 1
+  - containsDocument:
+      kind: Certificate
+      apiVersion: cert-manager.io/v1
+      name: ignition-gan
+    template: certificates.yaml
+    documentIndex: 2
+  - containsDocument:
+      kind: Certificate
+      apiVersion: cert-manager.io/v1
+      name: ignition-tls
+    template: certificates.yaml
+    documentIndex: 3
+- it: TLS Certificate should include ingress hostname
+  set:
+    certManager.enabled: true
+    gateway.tls.enabled: true
+  template: certificates.yaml
+  documentIndex: 3
+  asserts:
+  - equal:
+      path: spec.commonName
+      value: "ignition.localtest.me"
+  - lengthEqual:
+      path: spec.dnsNames
+      count: 1
+  - equal:
+      path: spec.dnsNames[0]
+      value: "ignition.localtest.me"
+- it: TLS Certificate should include all ingress hostnames with redundancy
+  set:
+    certManager.enabled: true
+    gateway.tls.enabled: true
+    gateway.redundancy.enabled: true
+  template: certificates.yaml
+  documentIndex: 3
+  asserts:
+  - lengthEqual:
+      path: spec.dnsNames
+      count: 3
+  - equal:
+      path: spec.dnsNames[0]
+      value: "ignition.localtest.me"
+  - equal:
+      path: spec.dnsNames[1]
+      value: "ignition-primary.localtest.me"
+  - equal:
+      path: spec.dnsNames[2]
+      value: "ignition-backup.localtest.me"

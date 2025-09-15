@@ -145,23 +145,33 @@ tests:
     gateway.redundancy.enabled: true
   asserts:
   - hasDocuments:
-      count: 2
+      count: 1
   - equal:
       path: metadata.name
-      value: ignition-primary
-    documentIndex: 0
+      value: ignition
   - equal:
       path: spec.rules[0].http.paths[0].backend.service.name
       value: ignition-primary
-    documentIndex: 0
   - equal:
-      path: metadata.name
+      path: spec.rules[1].http.paths[0].backend.service.name
       value: ignition-backup
-    documentIndex: 1
+- it: Validate Base Redundancy with Ingress and TLS
+  set:
+    gateway.redundancy.enabled: true
+    ingress.tls.enabled: true
+  asserts:
   - equal:
-      path: spec.rules[0].http.paths[0].backend.service.name
-      value: ignition-backup
-    documentIndex: 1
+      path: spec.tls[0].secretName
+      value: "ignition-tls"
+  - equal:
+      path: spec.tls[0].hosts[0]
+      value: "ignition.localtest.me"
+  - equal:
+      path: spec.tls[0].hosts[1]
+      value: "ignition-primary.localtest.me"
+  - equal:
+      path: spec.tls[0].hosts[2]
+      value: "ignition-backup.localtest.me"
 - it: Validate Redundancy with Custom TLS
   set:
     gateway.redundancy.enabled: true
@@ -171,63 +181,11 @@ tests:
   - lengthEqual:
       path: spec.tls
       count: 2
-- it: Validate Redundancy with Custom TLS with Primary Override
-  set:
-    gateway.redundancy.enabled: true
-    ingress.customTLS: *custom-tls
-    ingress.primaryCustomTLS:
-    - *custom-tls-1
-  asserts:
-  - lengthEqual:
-      path: spec.tls
-      count: 1
-    documentIndex: 0
-  - lengthEqual:
-      path: spec.tls
-      count: 2
-    documentIndex: 1
-- it: Validate Redundancy with Custom TLS with Backup Override
-  set:
-    gateway.redundancy.enabled: true
-    ingress.customTLS: *custom-tls
-    ingress.backupCustomTLS:
-    - *custom-tls-1
-  asserts:
-  - lengthEqual:
-      path: spec.tls
-      count: 1
-    documentIndex: 1
-  - lengthEqual:
-      path: spec.tls
-      count: 2
-    documentIndex: 0
-- it: Validate Redundancy with Extra Rules with Primary Override
+- it: Validate Redundancy with Extra Rules
   set:
     gateway.redundancy.enabled: true
     ingress.customRules: *custom-rules
-    ingress.primaryCustomRules:
-    - *custom-rule-1
   asserts:
   - lengthEqual:
       path: spec.rules
-      count: 1
-    documentIndex: 0
-  - lengthEqual:
-      path: spec.rules
       count: 2
-    documentIndex: 1
-- it: Validate Redundancy with Extra Rules with Backup Override
-  set:
-    gateway.redundancy.enabled: true
-    ingress.customRules: *custom-rules
-    ingress.backupCustomRules:
-    - *custom-rule-1
-  asserts:
-  - lengthEqual:
-      path: spec.rules
-      count: 1
-    documentIndex: 1
-  - lengthEqual:
-      path: spec.rules
-      count: 2
-    documentIndex: 0

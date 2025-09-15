@@ -1,22 +1,11 @@
 {{- if .Values.ingress.enabled -}}
-{{- range $redundancyMode := (.Values.gateway.redundancy.enabled | ternary (list "primary" "backup") (list "")) }}
-{{- $prefix := (printf "%s-%s" (include "ignition.fullname" $) $redundancyMode) -}}
-{{- if empty $redundancyMode -}}
-{{- $prefix = (include "ignition.fullname" $) -}}
-{{- end -}}
-{{- with $ -}}
-{{- $host := (include "ignition.ingress.hostName" (list . $redundancyMode)) -}}
-{{- $includeHost := (ne $host "*") -}}
-{{- $baseAnnotations := .Values.ingress.annotations | default dict -}}
-{{- $annotations := (get .Values.ingress (empty $redundancyMode | ternary "annotations" (printf "%sAnnotations" $redundancyMode))) | default dict -}}
-{{- $annotations = merge $annotations $baseAnnotations -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ $prefix }}
+  name: {{ template "ignition.fullname" . }}
   labels:
     {{- include "ignition.labels" . | nindent 4 }}
-  {{- with $annotations }}
+  {{- with .Values.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
@@ -24,26 +13,27 @@ spec:
   {{- if .Values.ingress.className }}
   ingressClassName: {{ .Values.ingress.className }}
   {{- end }}
-  {{- $customTLS := (include "ignition.ingress.customTLS" (list . $redundancyMode)) -}}
+  {{- $customTLS := (include "ignition.ingress.customTLS" (list . "")) -}}
   {{- if $customTLS }}
   tls:
   {{- $customTLS | nindent 2 }}
   {{- else if .Values.ingress.tls.enabled }}
   tls:
-  - secretName: {{ ((print $prefix "-tls") | quote) }}
-    {{- if $includeHost }}
+  - secretName: {{ ((print (include "ignition.fullname" $) "-tls") | quote) }}
     hosts:
-    - {{ $host | quote }}
-      {{- range $i := until ((include "ignition.ingress.podIndexedHostNameCount" .) | int) }}
-    - {{ (include "ignition.ingress.podIndexedHostName" (list $ $i)) | quote }}
-      {{- end }}
-    {{- end }}
+    {{- (include "ignition.ingress.hostNames" $) | nindent 4 }}
   {{- end }}
   rules:
-  {{- $customRules := (include "ignition.ingress.customRules" (list . $redundancyMode)) -}}
+  {{- $customRules := (include "ignition.ingress.customRules" (list . "")) -}}
   {{- if $customRules }}
   {{- $customRules | nindent 2 }}
   {{- else }}
+  {{- range $redundancyMode := (.Values.gateway.redundancy.enabled | ternary (list "primary" "backup") (list "")) }}
+  {{- $prefix := (printf "%s-%s" (include "ignition.fullname" $) $redundancyMode) }}
+  {{- if empty $redundancyMode }}
+  {{- $prefix = (include "ignition.fullname" $) }}
+  {{- end }}
+  {{- $host := (include "ignition.ingress.hostName" (list $ $redundancyMode)) }}
   - http:
       paths:
       - path: /
@@ -52,14 +42,13 @@ spec:
           service:
             name: {{ $prefix }}
             port:
-              {{- if .Values.gateway.tls.enabled }}
+              {{- if $.Values.gateway.tls.enabled }}
               name: https
               {{- else }}
               name: http
               {{- end }}
-    {{- if $includeHost }}
     host: {{ $host | quote }}
-    {{- end }}
+  {{- end }}
   {{- range $i := until ((include "ignition.ingress.podIndexedHostNameCount" .) | int) }}
   {{- $podIndexedHostname := (include "ignition.ingress.podIndexedHostName" (list $ $i)) }}
   - http:
@@ -68,25 +57,18 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: {{ $prefix }}-{{ $i }}
+            name: {{ template "ignition.fullname" $ }}-{{ $i }}
             port:
               {{- if $.Values.gateway.tls.enabled }}
               name: https
               {{- else }}
               name: http
               {{- end }}
-    {{- if not $includeHost }}
-    {{- fail "Cannot omit host with pod-indexed Ingress rules" }}
-    {{- else }}
     host: {{ $podIndexedHostname | quote }}
-    {{- end }}
   {{- end }}
-  {{- $extraRules := (include "ignition.ingress.extraRules" (list . $redundancyMode)) -}}
+  {{- $extraRules := (include "ignition.ingress.extraRules" (list . "")) -}}
   {{- if $extraRules }}
   {{- $extraRules | nindent 2 }}
   {{- end }}
   {{- end }}
----
-{{- end }}
-{{ end }}
 {{- end }}

@@ -587,6 +587,25 @@ Render an Ingress Hostname based on redundancy configuration
 {{- end }}
 
 {{/*
+Render an array of Ingress Hostnames, including pod-indexed hostnames where applicable
+*/}}
+{{- define "ignition.ingress.hostNames" -}}
+{{- $baseHost := (include "ignition.ingress.hostName" (list . "")) -}}
+- {{ $baseHost | quote }}
+  {{- if .Values.gateway.redundancy.enabled }}
+    {{- range $redundancyMode := (list "primary" "backup") }}
+      {{- $host := (include "ignition.ingress.hostName" (list $ $redundancyMode)) }}
+      {{- if ne $host $baseHost }}
+- {{ $host | quote }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+  {{- range $i := until ((include "ignition.ingress.podIndexedHostNameCount" .) | int) }}
+- {{ (include "ignition.ingress.podIndexedHostName" (list $ $i)) | quote }}
+  {{- end }}
+{{- end }}
+
+{{/*
 Renders the count of pod-indexed ingress rules and/or services
 */}}
 {{- define "ignition.podIndexedCount" -}}

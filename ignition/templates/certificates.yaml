@@ -23,6 +23,7 @@ spec:
   privateKey:
     algorithm: {{ .privateKeyAlgorithm }}
     size: {{ .privateKeySize }}
+    rotationPolicy: Always
   secretName: {{ .secretNameOverride | default $tlsIssuerName }}
   {{- end }}
   {{- end }}
@@ -51,6 +52,7 @@ spec:
   privateKey:
     algorithm: {{ .privateKeyAlgorithm }}
     size: {{ .privateKeySize }}
+    rotationPolicy: Always
   secretName: {{ .secretNameOverride | default $ganIssuerName }}
   {{- end }}
   {{- end }}
@@ -92,6 +94,8 @@ spec:
         name: {{ include "ignition.gateway.ganKeystoreSecret" $ }}
         key: {{ $.Values.gateway.gan.keystorePasswordKey }}
   secretName: {{ include "ignition.gateway.ganCertificateSecret" $ }}
+  privateKey:
+    rotationPolicy: Always
   {{- end }}
   {{- end }}
 {{ end }}
@@ -111,18 +115,10 @@ spec:
   {{- toYaml .Values.certManager.tlsCertificate.customSpec | nindent 2 }}
   {{- else }}
   {{- with .Values.certManager.tlsCertificate.spec }}
-  commonName: {{ .commonNameOverride | default (include "ignition.fullname" $) }}
+  {{- $baseHost := (include "ignition.ingress.hostName" (list $ "")) }}
+  commonName: {{ .commonNameOverride | default $baseHost }}
   dnsNames:
-  {{- if .dnsNames -}}
-  {{- range $dnsName := .dnsNames }}
-  - {{ $dnsName | quote }}
-  {{- end -}}
-  {{- else if $.Values.gateway.redundancy.enabled }}
-  - {{ printf "%s-primary.%s.%s" (include "ignition.fullname" $) $.Release.Namespace "svc.cluster.local" | quote }}
-  - {{ printf "%s-backup.%s.%s" (include "ignition.fullname" $) $.Release.Namespace "svc.cluster.local" | quote }}
-  {{- else }}
-  - {{ printf "%s.%s.%s" (include "ignition.fullname" $) $.Release.Namespace "svc.cluster.local" | quote }}
-  {{- end }}
+    {{- (include "ignition.ingress.hostNames" $) | nindent 2 }}
   duration: {{ .duration }}
   issuerRef:
     name: {{ $tlsIssuerName }}
@@ -135,6 +131,8 @@ spec:
         name: {{ include "ignition.gateway.tlsKeystoreSecret" $ }}
         key: {{ $.Values.gateway.tls.keystorePasswordKey }}
   secretName: {{ include "ignition.gateway.tlsCertificateSecret" $ }}
+  privateKey:
+    rotationPolicy: Always
   {{- end }}
   {{- end }}
 {{- end }}

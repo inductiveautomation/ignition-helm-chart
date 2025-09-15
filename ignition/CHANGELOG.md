@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+⚠️ **WARNING:** Possible breaking changes related to Ingress and certificate generation.  Please apply extra consideration to these areas while testing upgrades to this version of the chart.
+
+### Added
+
+- Added `commissioning.acceptModuleLicenses` and `commissioning.acceptModuleCertificates` arrays for auto-acceptance of third-party module EULA and certificates, new with Ignition 8.3.0.
+
+### Fixed
+
+- Removed a warning that emitted from creation of cert-manager certificates regarding private key rotation policy.  Set `privateKey.rotationPolicy` to `Always` which is the new default and recommended setting.
+
+### Changed
+
+- Changes to default `certManager.tlsCertificate` TLS certificate generation to use `ingress.hostName` in default spec.  Additionally, the common name is now included in the SAN list.
+- Redundant configurations now use a single `Ingress` resource with individual rules for the primary/backup routes.  Role-specific variants for `ingress.extraRules`, `ingress.customTLS`, and `ingress.annotations` are no longer applicable and will be ignored.
+- Bumped _appVersion_ for Ignition to 8.3.0.
+- Modified various file paths for Ignition 8.3.0 compatibility.
+- Refined gateway network and webserver TLS certificate prep scripts for 8.3.0 compatibility.
+
 ## [0.1.0] - 2025-09-07
 
 ### Added
