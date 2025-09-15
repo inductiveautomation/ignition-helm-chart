@@ -157,3 +157,22 @@ tests:
   asserts:
   - failedTemplate:
       errorPattern: "^error calling include.*"
+# ignition.gateway.deploymentMode
+- it: evaluate gateway.deploymentMode
+  set:
+    gateway.deploymentMode: "dev"
+  asserts:
+  - contains:
+      path: data["gateway.jvmArgs"]
+      content: -Dignition.config.mode=dev
+- it: evaluate gateway.deploymentMode empty
+  asserts:
+  - lengthEqual:
+      path: data["gateway.jvmArgs"]
+      count: 2
+  - contains:
+      path: data["gateway.jvmArgs"]
+      content: -XX:InitialRAMPercentage=75
+  - contains:
+      path: data["gateway.jvmArgs"]
+      content: -XX:MaxRAMPercentage=75

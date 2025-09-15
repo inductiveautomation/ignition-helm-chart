@@ -117,6 +117,10 @@ gateway:
   # see: https://docs.inductiveautomation.com/docs/8.1/platform/docker-image#gateway-arguments
   gatewayArgs: {}
 
+  # -- Ignition Deployment Mode (empty default does not specify an alternative mode)
+  # see: https://docs.inductiveautomation.com/docs/8.3/platform/gateway/web-interface/platform/gateway-deployment-modes
+  deploymentMode: ""
+
   # -- Init Container Configuration for Ignition Gateway
   preconfigure:
     # -- Set to true to enable the preconfigure initContainer

@@ -101,6 +101,9 @@ Emit the array elements for Ignition JVM args.
   {{- with .Values.gateway.loggers -}}
   {{- $jvmArgs = append $jvmArgs (printf "%s=%s" "-Dlogback.configurationFile" "/config/files/logback.xml") -}}
   {{- end -}}
+  {{- with .Values.gateway.deploymentMode -}}
+  {{- $jvmArgs = append $jvmArgs (printf "%s=%s" "-Dignition.config.mode" .) -}}
+  {{- end -}}
   {{- $jvmArgs = concat $jvmArgs (.Values.gateway.jvmArgs | default list) -}}
   {{- range $i, $jvmArg := $jvmArgs }}
     {{- /* JVM args have less structure, so we're just dumping the list here */ -}}
