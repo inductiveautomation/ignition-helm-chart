@@ -273,7 +273,7 @@ gateway:
   # -- Storage class for the Ignition Gateway data volume.  When unspecified, the default StorageClass will be used.
   dataVolumeStorageClass: ""
 
-  # -- Uses an ephemeral emptyDir volume for the Ignition Gateway data volume instead of a volume claim.  
+  # -- Uses an ephemeral emptyDir volume for the Ignition Gateway data volume instead of a volume claim.
   # The storage size via `dataVolumeStorageSize` is used as a size limit.
   dataVolumeUseEmptyDir: false
 
