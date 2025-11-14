@@ -22,7 +22,7 @@ The key should have fingerprint: `7D09D98C884BAE9248186059EFF55DC769C5C70D`
 ```bash
 # Import the public key
 gpg --import publickey.gpg.asc
-# Export to public keys to legacy keyring format used by Helm CLI
+# Export the public key to legacy keyring format used by Helm CLI
 gpg --export > ~/.gnupg/pubring.gpg
 ```
 
