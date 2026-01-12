@@ -88,8 +88,8 @@ function usage() {
   >&2 echo "Example: ./redundant-health-check.sh -s RUNNING http://localhost:8088/system/gwinfo"
   >&2 echo "Flags:"
   >&2 echo "  -r <state> - Expected redundant state (can be specified multiple times, defaults to 'Good', 'OutOfDate', and 'Incompatible' when omitted)"
-  >&2 echo "  -s <path/to/gan/secret> - The path to the mounted secret containing the webserver TLS certs/keystore (default: ${WEB_TLS_SECRETS_DIR})"
-  >&2 echo "  -d <path/to/data/folder> - The path to the Ignition data folder (default: ${IGNITION_DATA_DIR})"
+  >&2 echo "  -s <state> - Expected context state, defaults to 'RUNNING'"
+  >&2 echo "  -t <seconds> - Timeout in seconds for the health check request, defaults to 3 seconds"
   >&2 echo "  -h - Print this help message"
   >&2 echo "  -v - Enable verbose output"
 }
