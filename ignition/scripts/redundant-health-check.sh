@@ -12,7 +12,7 @@ port=${GATEWAY_HTTP_PORT:-8088}
 status_endpoint="http://localhost:${port}/system/gwinfo"
 timeout_secs=3
 expected_context_state=RUNNING
-expected_redundant_state=Good
+expected_redundant_states=(Good OutOfDate Incompatible)
 
 ###############################################################################
 # Invoke a Redundancy-aware Health Check
@@ -23,7 +23,7 @@ function main() {
     exit 1
   fi
 
-  debug "Status endpoint: ${status_endpoint}, expecting context state: ${expected_context_state}, expecting redundant state: ${expected_redundant_state}, timeout: ${timeout_secs}."
+  debug "Status endpoint: ${status_endpoint}, expecting context state: ${expected_context_state}, expecting redundant states: [${expected_redundant_states[*]}], timeout: ${timeout_secs}."
 
   curl_output=$(curl -s --max-time "${timeout_secs}" -L -k -f "${status_endpoint}" 2>&1)
 
@@ -43,15 +43,30 @@ function main() {
       echo "FAILED: ContextStatus is ${gwinfo_fields[ContextStatus]}, expected ${expected_context_state}" >&2
       exit 1
     fi
-  elif [ "${gwinfo_fields[RedundantState]}" != "${expected_redundant_state}" ]; then
+  elif ! validate_redundant_state "${gwinfo_fields[RedundantState]}"; then
     # Check RedundantNodeActiveStatus field
     if [ "${gwinfo_fields[RedundantNodeActiveStatus]}" != "Active" ]; then
-      echo "FAILED: Not Active and RedundantState is ${gwinfo_fields[RedundantState]}, expected ${expected_redundant_state}" >&2
+      echo "FAILED: Not Active and RedundantState is ${gwinfo_fields[RedundantState]}, expected one of: [${expected_redundant_states[*]}]" >&2
       exit 1
     fi
   fi
   debug "SUCCESS"
   exit 0
+}
+
+###############################################################################
+# Validate redundant state against expected states
+###############################################################################
+function validate_redundant_state() {
+  local actual_state="$1"
+  
+  for expected_state in "${expected_redundant_states[@]}"; do
+    if [ "${actual_state,,}" = "${expected_state,,}" ]; then
+      return 0
+    fi
+  done
+  
+  return 1
 }
 
 ###############################################################################
@@ -70,9 +85,9 @@ function debug() {
 function usage() {
 # usage redundant-health-check.sh 
   >&2 echo "Usage: $0 [flags] STATUS_ENDPOINT"
-  >&2 echo "Example: ./redundant-health-check.sh -r Good -s RUNNING http://localhost:8088/system/gwinfo"
+  >&2 echo "Example: ./redundant-health-check.sh -s RUNNING http://localhost:8088/system/gwinfo"
   >&2 echo "Flags:"
-  >&2 echo "  -r <state> - Expected redundant state (default: Good)"
+  >&2 echo "  -r <state> - Expected redundant state (can be specified multiple times, defaults to 'Good', 'OutOfDate', and 'Incompatible' when omitted)"
   >&2 echo "  -s <path/to/gan/secret> - The path to the mounted secret containing the webserver TLS certs/keystore (default: ${WEB_TLS_SECRETS_DIR})"
   >&2 echo "  -d <path/to/data/folder> - The path to the Ignition data folder (default: ${IGNITION_DATA_DIR})"
   >&2 echo "  -h - Print this help message"
@@ -80,13 +95,19 @@ function usage() {
 }
 
 # Argument Processing
+first_expected_state=true
 while getopts ":hvr:s:t:" opt; do
   case "$opt" in
   v)
     verbose=1
     ;;
   r)
-    expected_redundant_state=${OPTARG}
+    # If this is the first -r argument, clear the default and start fresh
+    if [ "${first_expected_state}" = true ]; then
+      expected_redundant_states=()
+      first_expected_state=false
+    fi
+    expected_redundant_states+=("${OPTARG}")
     ;;
   s)
     expected_context_state=${OPTARG}
