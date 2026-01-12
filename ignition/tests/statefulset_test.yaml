@@ -132,6 +132,14 @@ tests:
         app.kubernetes.io/instance: ignition
         app.kubernetes.io/version: "8.3.0"
         helm.sh/chart: ignition-0.1.0
+  - isSubset:
+      path: spec.template.metadata.labels
+      content:
+        app.kubernetes.io/name: foo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/instance: ignition
+        app.kubernetes.io/version: "8.3.0"
+        helm.sh/chart: ignition-0.1.0
         foo: bar
         bar: baz
 # Verify Pod AntiAffinity is applied correctly

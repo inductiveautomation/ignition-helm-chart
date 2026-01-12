@@ -2,7 +2,7 @@ apiVersion: v2
 name: ignition
 description: Ignition by Inductive Automation
 type: application
-version: 0.2.0
+version: 0.2.1
 appVersion: "8.3.0"
 kubeVersion: ">= 1.29.0-0"
 home: https://www.inductiveautomation.com
