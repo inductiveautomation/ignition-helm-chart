@@ -9,6 +9,7 @@ defaults:
 
 env:
   CT_CHART_DIRS: "."
+  CHART_NAME: "ignition"
 
 jobs:
   lint-and-unittest:
@@ -33,7 +34,7 @@ jobs:
 
       - name: helm-unittest (all changed charts)
         run: |
-          helm unittest ignition
+          helm unittest "${CHART_NAME}"
 
       - name: Set up chart-testing
         uses: helm/chart-testing-action@v2
@@ -41,3 +42,27 @@ jobs:
       - name: ct lint
         run: |
           ct lint --all
+
+      - name: Package Helm Chart (unsigned)
+        run: |
+          mkdir build
+          helm package --destination build "${CHART_NAME}"
+
+      - name: Render simple summary with GH hash to build/SUMMARY.md
+        run: |
+          cat << EOF > build/SUMMARY.md
+          # Build Summary
+
+          - Chart: ${CHART_NAME}
+          - Build Date: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          - Commit: ${GITHUB_SHA}
+          - Pull Request: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${{ github.event.pull_request.number }}
+          - Workflow Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          EOF
+
+      - name: Artifact Packaged Chart
+        uses: actions/upload-artifact@v6
+        with:
+          name: chart-build
+          path: build/
+          retention-days: 30
