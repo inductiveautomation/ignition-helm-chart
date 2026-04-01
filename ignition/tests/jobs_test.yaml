@@ -147,9 +147,9 @@ tests:
 - it: Validate Default Pod Security Context
   template: jobs.yaml
   asserts:
-  - isSubset:
+  - equal:
       path: spec.jobTemplate.spec.template.spec.securityContext
-      content:
+      value:
         runAsUser: 2003
         runAsGroup: 2003
         fsGroup: 2003
@@ -160,7 +160,37 @@ tests:
     podSecurityContext:
       runAsUser: 1234
   asserts:
-  - isSubset:
+  - equal:
       path: spec.jobTemplate.spec.template.spec.securityContext
-      content:
+      value:
         runAsUser: 1234
+- it: Validate Omitted Pod Security Context
+  template: jobs.yaml
+  set:
+    podSecurityContext: null
+  asserts:
+  - notExists:
+      path: spec.jobTemplate.spec.template.spec.securityContext
+- it: Validate Default Container Security Context
+  template: jobs.yaml
+  asserts:
+  - equal:
+      path: spec.jobTemplate.spec.template.spec.containers[0].securityContext
+      value:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+        seccompProfile:
+          type: RuntimeDefault
+- it: Validate Custom Container Security Context
+  template: jobs.yaml
+  set:
+    gateway:
+      securityContext:
+        allowPrivilegeEscalation: true
+  asserts:
+  - equal:
+      path: spec.jobTemplate.spec.template.spec.containers[0].securityContext
+      value:
+        allowPrivilegeEscalation: true

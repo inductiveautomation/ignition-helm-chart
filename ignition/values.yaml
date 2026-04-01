@@ -129,6 +129,8 @@ gateway:
     seedDataVolume: true
     # -- Array of additional "preconfigure" initContainer args to run before the Gateway starts
     additionalCmds: []
+    # -- Security Context Configuration for the "preconfigure" initContainer, defaults to same as gateway
+    securityContext: {}
     # -- Extra raw spec to be added to the "preconfigure" initContainer spec
     extraSpec: {}
 
@@ -260,6 +262,17 @@ gateway:
     keystorePasswordKey: "tls-keystore-password"
     # -- Defines a Helm resource policy to attach to the secret.
     # secretResourcePolicy: keep
+
+  # -- Security Context Configuration for the Ignition Gateway container.
+  # Defaults are shown commented below, which align with the "restricted" Pod Security Standard profile.
+  # Note: this security context is also used for certificate rotation CronJobs, when enabled.
+  securityContext: {}
+    # allowPrivilegeEscalation: false
+    # capabilities:
+    #   drop:
+    #   - ALL
+    # seccompProfile:
+    #   type: RuntimeDefault
 
   # -- Sets the PVC retention policy for when the statefulset is deleted.
   persistentVolumeClaimRetentionPolicy: Retain
@@ -551,6 +564,10 @@ ingress:
 # -- Defines the pod security context for the entire Ignition pod.
 # Default is UID/GID 2003 for container execution and volume ownership, enforcing non-root.
 podSecurityContext: {}
+  # runAsUser: 2003
+  # runAsGroup: 2003
+  # fsGroup: 2003
+  # runAsNonRoot: true
 
 # -- Defines extra annotations to apply to the Ignition pod.
 podAnnotations: {}

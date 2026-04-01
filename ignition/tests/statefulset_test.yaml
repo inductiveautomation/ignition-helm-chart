@@ -15,7 +15,7 @@ tests:
       apiVersion: apps/v1
       name: ignition-gateway
 # Security Context Tests
-- it: Validate Security Context
+- it: Validate Default Pod Security Context
   template: statefulset.yaml
   asserts:
   - isSubset:
@@ -25,6 +25,72 @@ tests:
         runAsGroup: 2003
         fsGroup: 2003
         runAsNonRoot: true
+- it: Validate Custom Pod Security Context
+  template: statefulset.yaml
+  set:
+    podSecurityContext:
+      runAsUser: 1234
+  asserts:
+  - isSubset:
+      path: spec.template.spec.securityContext
+      content:
+        runAsUser: 1234
+- it: Validate Omitted Pod Security Context
+  template: statefulset.yaml
+  set:
+    podSecurityContext: null
+  asserts:
+  - notExists:
+      path: spec.template.spec.securityContext
+- it: Validate Default Container Security Context
+  template: statefulset.yaml
+  asserts:
+  - isSubset:
+      path: spec.template.spec.containers[0].securityContext
+      content:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+        seccompProfile:
+          type: RuntimeDefault
+  - isSubset:
+      path: spec.template.spec.initContainers[0].securityContext
+      content:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+        seccompProfile:
+          type: RuntimeDefault
+- it: Validate Custom Container Security Context
+  template: statefulset.yaml
+  set:
+    gateway:
+      securityContext:
+        allowPrivilegeEscalation: true
+      preconfigure:
+        securityContext:
+          allowPrivilegeEscalation: true
+  asserts:
+  - isSubset:
+      path: spec.template.spec.containers[0].securityContext
+      content:
+        allowPrivilegeEscalation: true
+  - isSubset:
+      path: spec.template.spec.initContainers[0].securityContext
+      content:
+        allowPrivilegeEscalation: true
+- it: Validate Omitted Container Security Context
+  template: statefulset.yaml
+  set:
+    gateway.securityContext: null
+    gateway.preconfigure.securityContext: null
+  asserts:
+  - notExists:
+      path: spec.template.spec.containers[0].securityContext
+  - notExists:
+      path: spec.template.spec.initContainers[0].securityContext
 # Misc Tests
 - it: Validate Miscellaneous Settings
   template: statefulset.yaml

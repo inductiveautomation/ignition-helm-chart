@@ -17,15 +17,7 @@ spec:
     spec:
       template:
         spec:
-          securityContext:
-          {{- if .Values.podSecurityContext -}}
-            {{ toYaml .Values.podSecurityContext | nindent 12 }}
-          {{- else }}
-            runAsUser: 2003
-            runAsGroup: 2003
-            fsGroup: 2003
-            runAsNonRoot: true
-          {{- end }}
+          {{- include "ignition.security.podSecurityContext" .Values.podSecurityContext | nindent 10 }}
           restartPolicy: Never
           affinity:
             podAffinity:
@@ -52,6 +44,7 @@ spec:
             - /config/scripts/invoke-args.sh
             args:
             - /config/scripts/prepare-gan-certificates.sh
+            {{- include "ignition.security.containerSecurityContext" .Values.gateway.securityContext | nindent 12 }}
             volumeMounts:
             - mountPath: /data
               name: ignition-data
@@ -102,15 +95,7 @@ spec:
     spec:
       template:
         spec:
-          securityContext:
-          {{- if .Values.podSecurityContext -}}
-            {{ toYaml .Values.podSecurityContext | nindent 12 }}
-          {{- else }}
-            runAsUser: 2003
-            runAsGroup: 2003
-            fsGroup: 2003
-            runAsNonRoot: true
-          {{- end }}
+          {{- include "ignition.security.podSecurityContext" .Values.podSecurityContext | nindent 10 }}
           restartPolicy: Never
           affinity:
             podAffinity:
@@ -137,6 +122,7 @@ spec:
             - /config/scripts/invoke-args.sh
             args:
             - /config/scripts/prepare-tls-certificates.sh
+            {{- include "ignition.security.containerSecurityContext" .Values.gateway.securityContext | nindent 12 }}
             volumeMounts:
             - mountPath: /data
               name: ignition-data

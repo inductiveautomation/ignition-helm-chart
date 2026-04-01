@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Bumped _appVersion_ for Ignition to 8.3.4.
+- New container-level security context defaults, see _Added_ section for more details.  Also refactored pod-level security context defaults to use a shared helper template.
+
+### Added
+
+- Added `gateway.securityContext` and `gateway.preconfigure.securityContext` with new defaults to align with "restricted" Pod Security Standards profile.
 
 ## [0.2.1] - 2026-01-30
 

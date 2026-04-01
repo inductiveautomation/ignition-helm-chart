@@ -42,15 +42,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "ignition.serviceAccountName" . }}
-      securityContext:
-      {{- if .Values.podSecurityContext }}
-        {{ toYaml .Values.podSecurityContext | nindent 8 }}
-      {{- else }}
-        runAsUser: 2003
-        runAsGroup: 2003
-        fsGroup: 2003
-        runAsNonRoot: true
-      {{- end }}
+      {{- include "ignition.security.podSecurityContext" .Values.podSecurityContext | nindent 6 }}
       {{- if or .Values.affinity .Values.podAntiAffinity }}
       affinity:
         {{- with .Values.affinity }}
@@ -126,6 +118,7 @@ spec:
         {{- with .Values.gateway.envFrom }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+        {{- include "ignition.security.containerSecurityContext" .Values.gateway.securityContext | nindent 8 }}
         volumeMounts:
         - mountPath: /usr/local/bin/ignition/data
           name: data
@@ -223,6 +216,7 @@ spec:
         {{- . | indent 8 }}
         {{- end }}
         {{- end }}
+        {{- include "ignition.security.containerSecurityContext" .Values.gateway.preconfigure.securityContext | nindent 8 }}
         volumeMounts:
         - mountPath: /data
           name: data

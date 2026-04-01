@@ -778,6 +778,42 @@ Render an invocation of the prepare-redundancy.sh script, adding a flag for redu
   {{- end }}
 {{- end }}
 
+{{/*
+Render a pod-level security context block
+*/}}
+{{- define "ignition.security.podSecurityContext" }}
+  {{- if not (eq . nil) }}
+    {{- printf "securityContext:" }}
+    {{- if . -}}
+      {{- toYaml . | nindent 2}}
+    {{- else }}
+  runAsUser: 2003
+  runAsGroup: 2003
+  fsGroup: 2003
+  runAsNonRoot: true
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+{{/*
+Render a container-level security context block
+*/}}
+{{- define "ignition.security.containerSecurityContext" }}
+  {{- if not (eq . nil) }}
+    {{- printf "securityContext:" }}
+    {{- if . -}}
+      {{- toYaml . | nindent 2}}
+    {{- else }}
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  seccompProfile:
+    type: RuntimeDefault
+    {{- end }}
+  {{- end }}
+{{- end }}
+
 {{- define "ignition.renderCommaDelimitedArray" -}}
   {{- $array := . }}
   {{- $vals := list }}
