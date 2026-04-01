@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed an issue where `podLabels` were incorrectly applied to StatefulSet metadata instead of pod metadata.
+
 ### Changed
 
 - Bumped _appVersion_ for Ignition to 8.1.53.
