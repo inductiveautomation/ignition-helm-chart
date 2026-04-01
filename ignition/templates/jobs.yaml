@@ -18,8 +18,8 @@ spec:
       template:
         spec:
           securityContext:
-          {{- if .Values.podSecurityContext }}
-            {{ toYaml .Values.podSecurityContext | nindent 8 }}
+          {{- if .Values.podSecurityContext -}}
+            {{ toYaml .Values.podSecurityContext | nindent 12 }}
           {{- else }}
             runAsUser: 2003
             runAsGroup: 2003
@@ -103,8 +103,8 @@ spec:
       template:
         spec:
           securityContext:
-          {{- if .Values.podSecurityContext }}
-            {{ toYaml .Values.podSecurityContext | nindent 8 }}
+          {{- if .Values.podSecurityContext -}}
+            {{ toYaml .Values.podSecurityContext | nindent 12 }}
           {{- else }}
             runAsUser: 2003
             runAsGroup: 2003

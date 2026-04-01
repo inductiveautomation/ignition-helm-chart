@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed YAML indent syntax error in certificate rotation jobs with custom Pod Security Context.
+
 ### Changed
 
 - Bumped _appVersion_ for Ignition to 8.3.4.
