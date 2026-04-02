@@ -139,6 +139,10 @@ tests:
         configMap:
           name: ignition-config-files
           defaultMode: 0644
+  # Check default arg count
+  - lengthEqual:
+      path: spec.template.spec.containers[0].args
+      count: 14
 # Verify StatefulSet naming
 - it: Validate StatefulSet name
   template: statefulset.yaml
@@ -589,3 +593,25 @@ tests:
   - contains:
       path: spec.template.spec.initContainers[0].args
       content: '/config/scripts/prepare-redundancy.sh -g "ignition-gateway-0.ignition" -l -v'
+- it: Validate Terminate Leased Sessions on Shutdown is applied when enabled
+  template: statefulset.yaml
+  set:
+    gateway.licensing.leasedActivation:
+      secretName: leased-license1
+      terminateSessionOnShutdown: true
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[0].args
+      content: '-Dignition.license.leased-activation-terminate-sessions-on-shutdown=true'
+- it: Validate Terminate Leased Sessions on Shutdown deduplication of existing JVM arg
+  template: statefulset.yaml
+  set:
+    gateway.licensing.leasedActivation:
+      secretName: leased-license1
+      terminateSessionOnShutdown: true
+    gateway.jvmArgs:
+    - '-Dignition.license.leased-activation-terminate-sessions-on-shutdown=true'
+  asserts:
+  - lengthEqual:
+      path: spec.template.spec.containers[0].args
+      count: 15

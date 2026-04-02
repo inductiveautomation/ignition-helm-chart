@@ -98,6 +98,12 @@ Emit the array elements for Ignition JVM args.
     {{- $jvmArgs = append $jvmArgs (printf "%s=%v" "-XX:MaxDirectMemorySize" .) -}}
     {{- end }}
   {{- end -}}
+  {{- if eq "true" (include "ignition.gateway.licensing.leasedActivation.terminateSessionOnShutdown" .) -}}
+    {{- $terminateSessionSysProp := "-Dignition.license.leased-activation-terminate-sessions-on-shutdown=true" -}}
+    {{- if not (has $terminateSessionSysProp .Values.gateway.jvmArgs) -}}
+      {{- $jvmArgs = append $jvmArgs $terminateSessionSysProp -}}
+    {{- end -}}
+  {{- end -}}
   {{- with .Values.gateway.loggers -}}
   {{- $jvmArgs = append $jvmArgs (printf "%s=%s" "-Dlogback.configurationFile" "/config/files/logback.xml") -}}
   {{- end -}}
@@ -787,6 +793,15 @@ Returns "true" if leased activation licensing should use a redundancy split conf
   ) 0 -}}
 
   {{- printf "%t" (and $shouldRender .Values.gateway.redundancy.enabled) }}
+{{- end }}
+
+{{/*
+Returns "true" if leased activation sessions should be terminated during graceful shutdown
+*/}}
+{{- define "ignition.gateway.licensing.leasedActivation.terminateSessionOnShutdown" -}}
+  {{- $licensing := .Values.gateway.licensing -}}
+  {{- $terminate := dig "leasedActivation" "terminateSessionOnShutdown" false $licensing -}}
+  {{- printf "%t" $terminate }}
 {{- end }}
 
 {{/*

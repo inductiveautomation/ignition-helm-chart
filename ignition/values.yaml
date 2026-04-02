@@ -69,6 +69,8 @@ gateway:
       # licenseKeyKey: "ignition-license-key"
       # -- Specify the Secret key under which the activation token is stored
       # activationTokenKey: "ignition-activation-token"
+      # -- Set to true to attempt online license session termination during graceful shutdown
+      # terminateSessionOnShutdown: false
 
   # -- Ignition Redundancy Configuration
   redundancy:
