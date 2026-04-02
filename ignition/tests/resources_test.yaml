@@ -25,12 +25,12 @@ tests:
 - it: Validate Default Resources
   template: statefulset.yaml
   asserts:
-  - isSubset:
+  - equal:
       path: spec.template.spec.containers[0].resources
-      content: *default-resources
-  - isSubset:
+      value: *default-resources
+  - equal:
       path: spec.template.spec.initContainers[0].resources
-      content: *default-resources
+      value: *default-resources
 - it: Validate Resources Disabled
   template: statefulset.yaml
   set:
@@ -47,12 +47,12 @@ tests:
     gateway.resourcesEnabled: true
     gateway.resources: *custom-resources
   asserts:
-  - isSubset:
+  - equal:
       path: spec.template.spec.containers[0].resources
-      content: *custom-resources
-  - isSubset:
+      value: *custom-resources
+  - equal:
       path: spec.template.spec.initContainers[0].resources
-      content: *custom-resources
+      value: *custom-resources
 - it: Validate Custom Memory Percentage
   template: statefulset.yaml
   set:
@@ -75,8 +75,3 @@ tests:
   - equal:
       path: spec.template.spec.containers[0].args[13]
       value: -XX:MaxRAMPercentage=50
-
-        
-  # - isSubset:
-  #     path: spec.template.spec.initContainers[0].resources
-  #     content: *custom-resources

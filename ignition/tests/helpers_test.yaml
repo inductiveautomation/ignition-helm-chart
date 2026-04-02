@@ -142,9 +142,9 @@ tests:
       value: ignition
 - it: evaluate null content
   asserts:
-  - isSubset:
+  - equal:
       path: metadata.labels
-      content:
+      value:
         helm.sh/chart: ignition-0.0.36
         app.kubernetes.io/name: ignition
         app.kubernetes.io/instance: ignition

@@ -21,9 +21,9 @@ tests:
 - it: Validate Default Readiness Probe
   template: statefulset.yaml
   asserts:
-  - isSubset:
+  - equal:
       path: spec.template.spec.containers[0].readinessProbe
-      content: *default-readiness-probe
+      value: *default-readiness-probe
 - it: Validate Default Readiness Probe with Redundancy Enabled
   template: statefulset.yaml
   set:
@@ -43,9 +43,9 @@ tests:
       failureThreshold: 3
       timeoutSeconds: 4
   asserts:
-  - isSubset:
+  - equal:
       path: spec.template.spec.containers[0].readinessProbe
-      content:
+      value:
         exec:
           command:
           - "custom-health-check.sh"

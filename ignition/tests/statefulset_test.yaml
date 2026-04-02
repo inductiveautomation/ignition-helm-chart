@@ -18,9 +18,9 @@ tests:
 - it: Validate Default Pod Security Context
   template: statefulset.yaml
   asserts:
-  - isSubset:
+  - equal:
       path: spec.template.spec.securityContext
-      content:
+      value:
         runAsUser: 2003
         runAsGroup: 2003
         fsGroup: 2003
@@ -31,9 +31,9 @@ tests:
     podSecurityContext:
       runAsUser: 1234
   asserts:
-  - isSubset:
+  - equal:
       path: spec.template.spec.securityContext
-      content:
+      value:
         runAsUser: 1234
 - it: Validate Omitted Pod Security Context
   template: statefulset.yaml
@@ -45,18 +45,18 @@ tests:
 - it: Validate Default Container Security Context
   template: statefulset.yaml
   asserts:
-  - isSubset:
+  - equal:
       path: spec.template.spec.containers[0].securityContext
-      content:
+      value:
         allowPrivilegeEscalation: false
         capabilities:
           drop:
           - ALL
         seccompProfile:
           type: RuntimeDefault
-  - isSubset:
+  - equal:
       path: spec.template.spec.initContainers[0].securityContext
-      content:
+      value:
         allowPrivilegeEscalation: false
         capabilities:
           drop:
@@ -69,17 +69,21 @@ tests:
     gateway:
       securityContext:
         allowPrivilegeEscalation: true
+        seccompProfile:
+          type: RuntimeDefault
       preconfigure:
         securityContext:
           allowPrivilegeEscalation: true
   asserts:
-  - isSubset:
+  - equal:
       path: spec.template.spec.containers[0].securityContext
-      content:
+      value:
         allowPrivilegeEscalation: true
-  - isSubset:
+        seccompProfile:
+          type: RuntimeDefault
+  - equal:
       path: spec.template.spec.initContainers[0].securityContext
-      content:
+      value:
         allowPrivilegeEscalation: true
 - it: Validate Omitted Container Security Context
   template: statefulset.yaml
@@ -171,9 +175,9 @@ tests:
   release:
     name: ignition2
   asserts:
-  - isSubset:
+  - equal:
       path: metadata.labels
-      content:
+      value:
         app.kubernetes.io/name: ignition
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/instance: ignition2
@@ -190,17 +194,17 @@ tests:
       bar: baz
     nameOverride: foo
   asserts:
-  - isSubset:
+  - equal:
       path: metadata.labels
-      content:
+      value:
         app.kubernetes.io/name: foo
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/instance: ignition
         app.kubernetes.io/version: "8.3.0"
         helm.sh/chart: ignition-0.1.0
-  - isSubset:
+  - equal:
       path: spec.template.metadata.labels
-      content:
+      value:
         app.kubernetes.io/name: foo
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/instance: ignition
@@ -216,9 +220,9 @@ tests:
   release:
     name: ignition2
   asserts:
-  - isSubset:
+  - equal:
       path: spec.template.spec.affinity
-      content:
+      value:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
           - labelSelector:
@@ -259,9 +263,9 @@ tests:
               - '{{ .Release.Name }}'
           topologyKey: kubernetes.io/hostname
   asserts:
-  - isSubset:
+  - equal:
       path: spec.template.spec.affinity
-      content:
+      value:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
           - weight: 100

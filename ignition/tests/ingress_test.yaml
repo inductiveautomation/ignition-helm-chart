@@ -76,9 +76,9 @@ tests:
     ingress.annotations:
       traefik.ingress.kubernetes.io/router.entrypoints: web
   asserts:
-  - isSubset:
+  - equal:
       path: metadata.annotations
-      content:
+      value:
         traefik.ingress.kubernetes.io/router.entrypoints: web
 # Validate Ingress TLS Configuration
 - it: Validate Ingress TLS Configuration
@@ -89,9 +89,9 @@ tests:
   - lengthEqual:
       path: spec.tls
       count: 1
-  - isSubset:
+  - equal:
       path: spec.tls[0]
-      content:
+      value:
         secretName: ignition-tls
         hosts:
         - "ignition.localtest.me"
