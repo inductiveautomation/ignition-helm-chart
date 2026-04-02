@@ -312,9 +312,18 @@ tests:
     gateway.redundancy.enabled: true
     gateway.env.GATEWAY_NETWORK_REQUIRESSL: false
   asserts:
+  - lengthEqual:
+      path: spec.template.spec.initContainers[0].args
+      count: 3
   - contains:
       path: spec.template.spec.initContainers[0].args
       content: '/config/scripts/prepare-redundancy.sh -g "ignition-gateway-0.ignition" -k -v'
+- it: Validate Redundancy Preparation Script Not Included when Redundancy Disabled
+  template: statefulset.yaml
+  asserts:
+  - lengthEqual:
+      path: spec.template.spec.initContainers[0].args
+      count: 2
 # Validate EmptyDir Data Volume
 - it: Validate Presence of Volume Claim Template by default
   template: statefulset.yaml
@@ -336,3 +345,247 @@ tests:
         name: data
         emptyDir:
           sizeLimit: "3Gi"
+---
+suite: StatefulSet Licensing Tests
+release:
+  name: ignition
+  namespace: ignition-test
+templates:
+- statefulset.yaml
+- configmap.yaml
+tests:
+# Leased Activation Licensing Tests
+- it: Validate Leased License Configuration Fails without secretName (Standalone)
+  template: statefulset.yaml
+  set:
+    gateway.licensing.leasedActivation:
+      foo: bar
+  asserts:
+  - failedTemplate:
+      errorMessage: "Must supply licensing Secret name"
+- it: Validate Leased License Configuration Fails without secretName (Redundancy, Shared)
+  template: statefulset.yaml
+  set:
+    gateway.redundancy.enabled: true
+    gateway.licensing.leasedActivation:
+      foo: bar
+  asserts:
+  - failedTemplate:
+      errorMessage: "Must supply primary/backup or shared licensing Secret name"
+- it: Validate Leased License Configuration Fails without secretName on primary (Redundancy, Split)
+  template: statefulset.yaml
+  set:
+    gateway.redundancy.enabled: true
+    gateway.licensing.primaryLeasedActivation:
+      foo: bar
+    gateway.licensing.backupLeasedActivation:
+      secretName: leased-license2
+  asserts:
+  - failedTemplate:
+      errorMessage: "Must supply primary/backup or shared licensing Secret name"
+- it: Validate Leased License Configuration Fails without secretName on backup (Redundancy, Split)
+  template: statefulset.yaml
+  set:
+    gateway.redundancy.enabled: true
+    gateway.licensing.primaryLeasedActivation:
+      secretName: leased-license1
+    gateway.licensing.backupLeasedActivation:
+      foo: bar
+  asserts:
+  - failedTemplate:
+      errorMessage: "Must supply primary/backup or shared licensing Secret name"
+- it: Validate Leased License Configuration (Standalone)
+  template: statefulset.yaml
+  set:
+    gateway.licensing.leasedActivation:
+      secretName: "leased-license1"
+  asserts:
+  - lengthEqual:
+      path: spec.template.spec.volumes[2].projected.sources
+      count: 2
+  - contains:
+      path: spec.template.spec.volumes[2].projected.sources
+      content:
+        secret:
+          items:
+          - key: ignition-license-key
+            path: ignition-license-key
+          - key: ignition-activation-token
+            path: ignition-activation-token
+          name: leased-license1
+- it: Validate Leased License Configuration (Redundancy, Shared)
+  template: statefulset.yaml
+  set:
+    gateway.redundancy.enabled: true
+    gateway.licensing.leasedActivation:
+      secretName: "leased-license1"
+  asserts:
+  - lengthEqual:
+      path: spec.template.spec.volumes[2].projected.sources
+      count: 2
+  - contains:
+      path: spec.template.spec.volumes[2].projected.sources
+      content:
+        secret:
+          items:
+          - key: ignition-license-key
+            path: primary-ignition-license-key
+          - key: ignition-activation-token
+            path: primary-ignition-activation-token
+          - key: ignition-license-key
+            path: backup-ignition-license-key
+          - key: ignition-activation-token
+            path: backup-ignition-activation-token
+          name: leased-license1
+- it: Validate Leased License Configuration (Redundancy, Split)
+  template: statefulset.yaml
+  set:
+    gateway.redundancy.enabled: true
+    gateway.licensing:
+      primaryLeasedActivation:
+        secretName: "leased-license1"
+      backupLeasedActivation:
+        secretName: "leased-license2"
+  asserts:
+  - lengthEqual:
+      path: spec.template.spec.volumes[2].projected.sources
+      count: 3
+  - contains:
+      path: spec.template.spec.volumes[2].projected.sources
+      content:
+        secret:
+          items:
+          - key: ignition-license-key
+            path: primary-ignition-license-key
+          - key: ignition-activation-token
+            path: primary-ignition-activation-token
+          name: leased-license1
+  - contains:
+      path: spec.template.spec.volumes[2].projected.sources
+      content:
+        secret:
+          items:
+          - key: ignition-license-key
+            path: backup-ignition-license-key
+          - key: ignition-activation-token
+            path: backup-ignition-activation-token
+          name: leased-license2
+- it: Validate Leased License Configuration Coalesce on Primary (Redundancy)
+  template: statefulset.yaml
+  set:
+    gateway.redundancy.enabled: true
+    gateway.licensing.leasedActivation:
+      secretName: leased-license1
+    gateway.licensing.backupLeasedActivation:
+      secretName: leased-license2
+      activationTokenKey: special-ignition-activation-token
+  asserts:
+  - lengthEqual:
+      path: spec.template.spec.volumes[2].projected.sources
+      count: 3
+  - contains:
+      path: spec.template.spec.volumes[2].projected.sources
+      content:
+        secret:
+          items:
+          - key: ignition-license-key
+            path: primary-ignition-license-key
+          - key: ignition-activation-token
+            path: primary-ignition-activation-token
+          name: leased-license1
+  - contains:
+      path: spec.template.spec.volumes[2].projected.sources
+      content:
+        secret:
+          items:
+          - key: ignition-license-key
+            path: backup-ignition-license-key
+          - key: special-ignition-activation-token
+            path: backup-ignition-activation-token
+          name: leased-license2
+- it: Validate Leased License Configuration Coalesce on Backup (Redundancy)
+  template: statefulset.yaml
+  set:
+    gateway.redundancy.enabled: true
+    gateway.licensing.leasedActivation:
+      secretName: leased-license1
+      licenseKeyKey: special-ignition-license-key
+    gateway.licensing.primaryLeasedActivation:
+      secretName: leased-license2
+  asserts:
+  - lengthEqual:
+      path: spec.template.spec.volumes[2].projected.sources
+      count: 3
+  - contains:
+      path: spec.template.spec.volumes[2].projected.sources
+      content:
+        secret:
+          items:
+          - key: special-ignition-license-key
+            path: primary-ignition-license-key
+          - key: ignition-activation-token
+            path: primary-ignition-activation-token
+          name: leased-license2
+  - contains:
+      path: spec.template.spec.volumes[2].projected.sources
+      content:
+        secret:
+          items:
+          - key: special-ignition-license-key
+            path: backup-ignition-license-key
+          - key: ignition-activation-token
+            path: backup-ignition-activation-token
+          name: leased-license1
+- it: Validate Leased License Configuration Split Keys on Shared Secret (Redundancy)
+  template: statefulset.yaml
+  set:
+    gateway.redundancy.enabled: true
+    gateway.licensing:
+      leasedActivation:
+        secretName: leased-license
+      primaryLeasedActivation:
+        licenseKeyKey: primary-license-key
+        activationTokenKey: primary-activation-token
+      backupLeasedActivation:
+        licenseKeyKey: backup-license-key
+        activationTokenKey: backup-activation-token
+  asserts:
+  - lengthEqual:
+      path: spec.template.spec.volumes[2].projected.sources
+      count: 2
+  - contains:
+      path: spec.template.spec.volumes[2].projected.sources
+      content:
+        secret:
+          items:
+          - key: primary-license-key
+            path: primary-ignition-license-key
+          - key: primary-activation-token
+            path: primary-ignition-activation-token
+          - key: backup-license-key
+            path: backup-ignition-license-key
+          - key: backup-activation-token
+            path: backup-ignition-activation-token
+          name: leased-license
+- it: Validate Redundancy Preparation Script Inclusion with Leased Licensing (Shared)
+  template: statefulset.yaml
+  set:
+    gateway.redundancy.enabled: true
+    gateway.licensing.primaryLeasedActivation:
+      secretName: leased-license1
+    gateway.licensing.backupLeasedActivation:
+      secretName: leased-license2
+  asserts:
+  - contains:
+      path: spec.template.spec.initContainers[0].args
+      content: '/config/scripts/prepare-redundancy.sh -g "ignition-gateway-0.ignition" -l -v'
+- it: Validate Redundancy Preparation Script Inclusion with Leased Licensing (Shared)
+  template: statefulset.yaml
+  set:
+    gateway.redundancy.enabled: true
+    gateway.licensing.leasedActivation:
+      secretName: leased-license
+  asserts:
+  - contains:
+      path: spec.template.spec.initContainers[0].args
+      content: '/config/scripts/prepare-redundancy.sh -g "ignition-gateway-0.ignition" -l -v'
