@@ -787,9 +787,6 @@ Render a pod-level security context block
     {{- if . -}}
       {{- toYaml . | nindent 2}}
     {{- else }}
-  runAsUser: 2003
-  runAsGroup: 2003
-  fsGroup: 2003
   runAsNonRoot: true
     {{- end }}
   {{- end }}
