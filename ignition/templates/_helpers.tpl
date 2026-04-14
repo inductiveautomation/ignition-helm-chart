@@ -195,7 +195,7 @@ Assumes that "ignition.gateway.useMaxRAMPercentage" has already been checked.
     {{- end -}}
   {{- end -}}
 
-  {{- printf "%v" $maxRAMPercentage }}
+  {{- printf "%v" (int (min $maxRAMPercentage 100)) }}
 {{- end }}
 
 {{/*

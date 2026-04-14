@@ -213,6 +213,25 @@ tests:
   - contains:
       path: data["gateway.jvmArgs"]
       content: -XX:InitialRAMPercentage=60
+- it: check gateway.maxRAMPercentage over 100
+  set:
+    gateway.maxRAMPercentage: 150
+  asserts:
+  - contains:
+      path: data["gateway.jvmArgs"]
+      content: -XX:InitialRAMPercentage=100
+- it: check gateway.maxRAMPercentage negative value
+  set:
+    gateway.maxRAMPercentage: -1
+    gateway.resourcesEnabled: false
+  asserts:
+  - equal:
+      path: data["gateway.useMaxRAMPercentage"]
+      value: false
+  - notExists :
+      path: data["gateway.jvmArgs"]
+  - notExists:
+      path: data["gateway.wrapperArgs"]
 - it: check gateway.maxRAMPercentage of auto with resources disabled
   set:
     gateway.maxRAMPercentage: "auto"
