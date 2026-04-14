@@ -9,6 +9,7 @@ chart:
   appVersion: 8.1.48
 set:
   _testing.enabled: true
+  _testing.failIfNotNumber: "0"
 tests:
 # ignition.fullname
 - it: evaluate fullname
@@ -289,6 +290,55 @@ tests:
   asserts:
   - failedTemplate:
       errorPattern: "^Invalid value for gateway.initialRAMPercentage:.*"
+# ignition.failIfNotNumber
+- it: evaluate failIfNotNumber with valid integer
+  set:
+    _testing.failIfNotNumber: 123
+  asserts:
+  - notFailedTemplate: {}
+- it: evaluate failIfNotNumber with valid integer string
+  set:
+    _testing.failIfNotNumber: "123"
+  asserts:
+  - notFailedTemplate: {}
+- it: evaluate failIfNotNumber with valid float
+  set:
+    _testing.failIfNotNumber: 123.456
+  asserts:
+  - notFailedTemplate: {}
+- it: evaluate failIfNotNumber with valid float string
+  set:
+    _testing.failIfNotNumber: "123.456"
+  asserts:
+  - notFailedTemplate: {}
+- it: evaluate failIfNotNumber with valid scientific notation
+  set:
+    _testing.failIfNotNumber: 1.23e4
+  asserts:
+  - notFailedTemplate: {}
+- it: evaluate failIfNotNumber with valid scientific notation string
+  set:
+    _testing.failIfNotNumber: "1.23E+04"
+  asserts:
+  - notFailedTemplate: {}
+- it: evaluate failIfNotNumber with invalid number
+  set:
+    _testing.failIfNotNumber: "not-a-number"
+  asserts:
+  - failedTemplate:
+      errorPattern: "^Invalid value \\(.*"
+- it: evaluate failIfNotNumber with empty string
+  set:
+    _testing.failIfNotNumber: ""
+  asserts:
+  - failedTemplate:
+      errorPattern: "^Invalid value \\(.*"
+- it: evaluate failIfNotNumber with null value
+  set:
+    _testing.failIfNotNumber: null
+  asserts:
+  - failedTemplate:
+      errorPattern: "^Invalid value \\(.*"
 # ignition.memoryLimitToBytes
 - it: evaluate memoryLimitToBytes for base-2
   set:

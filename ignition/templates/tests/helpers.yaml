@@ -12,6 +12,7 @@ metadata:
     {{- include "ignition.rinseThroughTpl" (dict "context" $ "content" .rinseThroughTpl) | nindent 4 }}
 data:
   commaDelimitedArray: {{ include "ignition.renderCommaDelimitedArray" .commaDelimitedArray | quote }}
+  failIfNotNumber: {{ include "ignition.failIfNotNumber" .failIfNotNumber }}
   gateway.useMaxRAMPercentage: {{ include "ignition.gateway.useMaxRAMPercentage" $ }}
   {{- with .memoryLimitToBytes }}
   memoryLimitToBytes:
