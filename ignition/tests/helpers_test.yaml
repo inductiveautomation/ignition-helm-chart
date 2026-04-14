@@ -213,6 +213,34 @@ tests:
   - contains:
       path: data["gateway.jvmArgs"]
       content: -XX:InitialRAMPercentage=60
+- it: check gateway.maxRAMPercentage of auto with resources disabled
+  set:
+    gateway.maxRAMPercentage: "auto"
+    gateway.resourcesEnabled: false
+  asserts:
+  - equal:
+      path: data["gateway.useMaxRAMPercentage"]
+      value: false
+  - notExists :
+      path: data["gateway.jvmArgs"]
+  - notExists:
+      path: data["gateway.wrapperArgs"]
+- it: check gateway.maxRAMPercentage of auto with resources set but no memory limit
+  set:
+    gateway.maxRAMPercentage: 75
+    gateway.resources:
+      limits:
+        cpu: 4000m
+      requests:
+        cpu: 4000m
+  asserts:
+  - equal:
+      path: data["gateway.useMaxRAMPercentage"]
+      value: false
+  - notExists :
+      path: data["gateway.jvmArgs"]
+  - notExists:
+      path: data["gateway.wrapperArgs"]
 - it: check initial RAM percentage limited to max RAM percentage
   set:
     gateway.maxRAMPercentage: 45
