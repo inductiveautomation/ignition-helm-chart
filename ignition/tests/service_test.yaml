@@ -25,19 +25,18 @@ tests:
 # Validate Defaults
 - it: Validate Default Ports
   asserts:
-  - isSubset:
-      path: spec
-      content:
-        ports:
-        - name: gan
-          port: 8060
-          targetPort: 8060
-        - name: http
-          port: 8088
-          targetPort: 8088
-        - name: https
-          port: 8043
-          targetPort: 8043 
+  - equal:
+      path: spec.ports
+      value:
+      - name: gan
+        port: 8060
+        targetPort: 8060
+      - name: http
+        port: 8088
+        targetPort: 8088
+      - name: https
+        port: 8043
+        targetPort: 8043 
 - it: Validate Default Service Type is ClusterIP
   asserts:
   - equal:
@@ -48,9 +47,9 @@ tests:
       value: None
 - it: Validate Default Selector
   asserts:
-  - isSubset:
+  - equal:
       path: spec.selector
-      content:
+      value:
         app.kubernetes.io/name: ignition
         app.kubernetes.io/instance: ignition
 - it: Validate Single Service Document
@@ -80,16 +79,15 @@ tests:
       value: ""
   - notExists:
       path: spec.loadBalancerSourceRanges
-  - isSubset:
-      path: spec
-      content:
-        ports:
-        - name: http
-          port: 8089
-          targetPort: http
-        - name: https
-          port: 8044
-          targetPort: https
+  - equal:
+      path: spec.ports
+      value:
+      - name: http
+        port: 8089
+        targetPort: http
+      - name: https
+        port: 8044
+        targetPort: https
 - it: Validate LoadBalancer Source Ranges
   set:
     service:
@@ -99,11 +97,10 @@ tests:
       loadBalancerSourceRanges:
         - 10.10.0.0/16
   asserts:
-  - isSubset:
-      path: spec
-      content:
-        loadBalancerSourceRanges:
-        - 10.10.0.0/16
+  - equal:
+      path: spec.loadBalancerSourceRanges
+      value:
+      - 10.10.0.0/16
 # NodePort Service Type Tests
 - it: Validate NodePort Requires Ports
   set:
@@ -126,16 +123,15 @@ tests:
   - equal:
       path: spec.clusterIP
       value: ""
-  - isSubset:
-      path: spec
-      content:
-        ports:
-        - name: http
-          port: 30080
-          targetPort: http
-        - name: https
-          port: 30443
-          targetPort: https
+  - equal:
+      path: spec.ports
+      value:
+      - name: http
+        port: 30080
+        targetPort: http
+      - name: https
+        port: 30443
+        targetPort: https
 # Custom Ports and Extra Spec
 - it: Validate Custom Ports
   set:
@@ -145,10 +141,9 @@ tests:
   - lengthEqual:
       path: spec.ports
       count: 2
-  - isSubset:
-      path: spec
-      content:
-        ports: *custom-ports
+  - equal:
+      path: spec.ports
+      value: *custom-ports
 - it: Validate Extra Service Spec
   set:
     service:
@@ -167,28 +162,25 @@ tests:
   asserts:
   - hasDocuments:
       count: 3
-  - isSubset:
-      path: spec
-      content:
-        selector:
-          app.kubernetes.io/name: ignition
-          app.kubernetes.io/instance: ignition
+  - equal:
+      path: spec.selector
+      value:
+        app.kubernetes.io/name: ignition
+        app.kubernetes.io/instance: ignition
     documentIndex: 2
-  - isSubset:
-      path: spec
-      content:
-        selector:
-          app.kubernetes.io/name: ignition
-          app.kubernetes.io/instance: ignition
-          apps.kubernetes.io/pod-index: "0"
+  - equal:
+      path: spec.selector
+      value:
+        app.kubernetes.io/name: ignition
+        app.kubernetes.io/instance: ignition
+        apps.kubernetes.io/pod-index: "0"
     documentIndex: 0
-  - isSubset:
-      path: spec
-      content:
-        selector:
-          app.kubernetes.io/name: ignition
-          app.kubernetes.io/instance: ignition
-          apps.kubernetes.io/pod-index: "1"
+  - equal:
+      path: spec.selector
+      value:
+        app.kubernetes.io/name: ignition
+        app.kubernetes.io/instance: ignition
+        apps.kubernetes.io/pod-index: "1"
     documentIndex: 1
 - it: Validate Custom Ports with Redundancy
   set:
@@ -206,37 +198,34 @@ tests:
       path: spec.ports
       count: 3
     documentIndex: 0
-  - isSubset:
-      path: spec
-      content:
-        ports:
-        - *custom-port-1
-        - *custom-port-2
-        - name: gan
-          port: 8061
-          targetPort: 8061
+  - equal:
+      path: spec.ports
+      value:
+      - *custom-port-1
+      - *custom-port-2
+      - name: gan
+        port: 8061
+        targetPort: 8061
     documentIndex: 0
   # Backup Service
   - lengthEqual:
       path: spec.ports
       count: 2
     documentIndex: 1
-  - isSubset:
-      path: spec
-      content:
-        ports:
-        - *custom-port-1
-        - *custom-port-2
+  - equal:
+      path: spec.ports
+      value:
+      - *custom-port-1
+      - *custom-port-2
     documentIndex: 1
   # Combined Service
   - lengthEqual:
       path: spec.ports
       count: 2
     documentIndex: 2
-  - isSubset:
-      path: spec
-      content:
-        ports: *custom-ports
+  - equal:
+      path: spec.ports
+      value: *custom-ports
     documentIndex: 2
 - it: Validate Extra Spec with Redundancy
   set:
@@ -297,46 +286,43 @@ tests:
       path: metadata.name
       value: ignition
     documentIndex: 0
-  - isSubset:
-      path: spec
-      content:
-        selector:
-          app.kubernetes.io/name: ignition
-          app.kubernetes.io/instance: ignition
+  - equal:
+      path: spec.selector
+      value:
+        app.kubernetes.io/name: ignition
+        app.kubernetes.io/instance: ignition
     documentIndex: 0
   # Index 0
-  - isSubset:
+  - equal:
       path: metadata.annotations
-      content:
+      value:
         foo: bar
     documentIndex: 1
   - equal:
       path: metadata.name
       value: ignition-0
     documentIndex: 1
-  - isSubset:
-      path: spec
-      content:
-        selector:
-          app.kubernetes.io/name: ignition
-          app.kubernetes.io/instance: ignition
-          apps.kubernetes.io/pod-index: "0"
+  - equal:
+      path: spec.selector
+      value:
+        app.kubernetes.io/name: ignition
+        app.kubernetes.io/instance: ignition
+        apps.kubernetes.io/pod-index: "0"
     documentIndex: 1
   # Index 1
-  - isSubset:
+  - equal:
       path: metadata.annotations
-      content:
+      value:
         foo: bar
     documentIndex: 1
   - equal:
       path: metadata.name
       value: ignition-1
     documentIndex: 2
-  - isSubset:
-      path: spec
-      content:
-        selector:
-          app.kubernetes.io/name: ignition
-          app.kubernetes.io/instance: ignition
-          apps.kubernetes.io/pod-index: "1"
+  - equal:
+      path: spec.selector
+      value:
+        app.kubernetes.io/name: ignition
+        app.kubernetes.io/instance: ignition
+        apps.kubernetes.io/pod-index: "1"
     documentIndex: 2

@@ -1,0 +1,193 @@
+suite: Jobs Tests
+release:
+  name: ignition
+  namespace: ignition-test
+templates:
+- jobs.yaml
+- configmap.yaml
+# Default configuration is GAN and TLS certificate rotation enabled
+set:
+  gateway:
+    tls:
+      enabled: true
+  certManager:
+    enabled: true
+    ganCertificate:
+      rotationEnabled: true
+    tlsCertificate:
+      rotationEnabled: true
+tests:
+# Rotation Job Existence and Kind Tests
+- it: Validate No Jobs when cert-manager is disabled
+  set:
+    certManager:
+      enabled: false
+  template: jobs.yaml
+  asserts:
+  - hasDocuments:
+      count: 0
+- it: Validate No Jobs when rotations are disabled
+  set:
+    certManager:
+      ganCertificate:
+        rotationEnabled: false
+      tlsCertificate:
+        rotationEnabled: false
+  template: jobs.yaml
+  asserts:
+  - hasDocuments:
+      count: 0
+- it: Validate TLS and GAN Rotation Jobs
+  template: jobs.yaml
+  asserts:
+  - hasDocuments:
+      count: 2
+  - containsDocument:
+      kind: CronJob
+      apiVersion: batch/v1
+      name: ignition-gateway-0-gan-cert-refresh
+    documentIndex: 0
+  - containsDocument:
+      kind: CronJob
+      apiVersion: batch/v1
+      name: ignition-gateway-0-tls-cert-refresh
+    documentIndex: 1
+- it: Validate TLS Rotation Job
+  template: jobs.yaml
+  set:
+    certManager:
+      ganCertificate:
+        rotationEnabled: false
+  asserts:
+  - hasDocuments:
+      count: 1
+  - containsDocument:
+      kind: CronJob
+      apiVersion: batch/v1
+      name: ignition-gateway-0-tls-cert-refresh
+- it: Validate Redundancy GAN Rotation Jobs (TLS disabled)
+  set:
+    gateway:
+      redundancy:
+        enabled: true
+      tls:
+        enabled: false
+    certManager:
+      enabled: true
+      ganCertificate:
+        rotationEnabled: true
+      tlsCertificate:
+        rotationEnabled: true
+  template: jobs.yaml
+  asserts:
+  - hasDocuments:
+      count: 2
+  - containsDocument:
+      kind: CronJob
+      apiVersion: batch/v1
+      name: ignition-gateway-0-gan-cert-refresh
+    documentIndex: 0
+  - containsDocument:
+      kind: CronJob
+      apiVersion: batch/v1
+      name: ignition-gateway-1-gan-cert-refresh
+    documentIndex: 1
+- it: Validate Redundancy TLS Rotation Jobs (GAN disabled)
+  set:
+    gateway:
+      redundancy:
+        enabled: true
+      tls:
+        enabled: true
+    certManager:
+      enabled: true
+      ganCertificate:
+        rotationEnabled: false
+      tlsCertificate:
+        rotationEnabled: true
+  template: jobs.yaml
+  asserts:
+  - hasDocuments:
+      count: 2
+  - containsDocument:
+      kind: CronJob
+      apiVersion: batch/v1
+      name: ignition-gateway-0-tls-cert-refresh
+    documentIndex: 0
+  - containsDocument:
+      kind: CronJob
+      apiVersion: batch/v1
+      name: ignition-gateway-1-tls-cert-refresh
+    documentIndex: 1
+# Rotation Schedule Tests
+- it: Validate Default Rotation Schedules
+  template: jobs.yaml
+  asserts:
+  - equal:
+      path: spec.schedule
+      value: "0 7 * * *"
+- it: Validate Custom Rotation Schedules
+  template: jobs.yaml
+  set:
+    certManager:
+      ganCertificate:
+        rotationFrequency: "0 1 * * *"
+      tlsCertificate:
+        rotationFrequency: "0 2 * * *"
+  asserts:
+  - equal:
+      path: spec.schedule
+      value: "0 1 * * *"
+    documentIndex: 0
+  - equal:
+      path: spec.schedule
+      value: "0 2 * * *"
+    documentIndex: 1
+# Security Context Tests
+- it: Validate Default Pod Security Context
+  template: jobs.yaml
+  asserts:
+  - equal:
+      path: spec.jobTemplate.spec.template.spec.securityContext
+      value:
+        runAsNonRoot: true
+- it: Validate Custom Pod Security Context
+  template: jobs.yaml
+  set:
+    podSecurityContext:
+      runAsUser: 1234
+  asserts:
+  - equal:
+      path: spec.jobTemplate.spec.template.spec.securityContext
+      value:
+        runAsUser: 1234
+- it: Validate Omitted Pod Security Context
+  template: jobs.yaml
+  set:
+    podSecurityContext: null
+  asserts:
+  - notExists:
+      path: spec.jobTemplate.spec.template.spec.securityContext
+- it: Validate Default Container Security Context
+  template: jobs.yaml
+  asserts:
+  - equal:
+      path: spec.jobTemplate.spec.template.spec.containers[0].securityContext
+      value:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+        seccompProfile:
+          type: RuntimeDefault
+- it: Validate Custom Container Security Context
+  template: jobs.yaml
+  set:
+    gateway:
+      securityContext:
+        allowPrivilegeEscalation: true
+  asserts:
+  - equal:
+      path: spec.jobTemplate.spec.template.spec.containers[0].securityContext
+      value:
+        allowPrivilegeEscalation: true

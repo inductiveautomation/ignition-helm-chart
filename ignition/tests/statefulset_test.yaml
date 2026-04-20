@@ -15,16 +15,83 @@ tests:
       apiVersion: apps/v1
       name: ignition-gateway
 # Security Context Tests
-- it: Validate Security Context
+- it: Validate Default Pod Security Context
   template: statefulset.yaml
   asserts:
-  - isSubset:
+  - equal:
       path: spec.template.spec.securityContext
-      content:
-        runAsUser: 2003
-        runAsGroup: 2003
-        fsGroup: 2003
+      value:
         runAsNonRoot: true
+- it: Validate Custom Pod Security Context
+  template: statefulset.yaml
+  set:
+    podSecurityContext:
+      runAsUser: 1234
+  asserts:
+  - equal:
+      path: spec.template.spec.securityContext
+      value:
+        runAsUser: 1234
+- it: Validate Omitted Pod Security Context
+  template: statefulset.yaml
+  set:
+    podSecurityContext: null
+  asserts:
+  - notExists:
+      path: spec.template.spec.securityContext
+- it: Validate Default Container Security Context
+  template: statefulset.yaml
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[0].securityContext
+      value:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+        seccompProfile:
+          type: RuntimeDefault
+  - equal:
+      path: spec.template.spec.initContainers[0].securityContext
+      value:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+        seccompProfile:
+          type: RuntimeDefault
+- it: Validate Custom Container Security Context
+  template: statefulset.yaml
+  set:
+    gateway:
+      securityContext:
+        allowPrivilegeEscalation: true
+        seccompProfile:
+          type: RuntimeDefault
+      preconfigure:
+        securityContext:
+          allowPrivilegeEscalation: true
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[0].securityContext
+      value:
+        allowPrivilegeEscalation: true
+        seccompProfile:
+          type: RuntimeDefault
+  - equal:
+      path: spec.template.spec.initContainers[0].securityContext
+      value:
+        allowPrivilegeEscalation: true
+- it: Validate Omitted Container Security Context
+  template: statefulset.yaml
+  set:
+    gateway.securityContext: null
+    gateway.preconfigure.securityContext: null
+  asserts:
+  - notExists:
+      path: spec.template.spec.containers[0].securityContext
+  - notExists:
+      path: spec.template.spec.initContainers[0].securityContext
 # Misc Tests
 - it: Validate Miscellaneous Settings
   template: statefulset.yaml
@@ -105,9 +172,9 @@ tests:
   release:
     name: ignition2
   asserts:
-  - isSubset:
+  - equal:
       path: metadata.labels
-      content:
+      value:
         app.kubernetes.io/name: ignition
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/instance: ignition2
@@ -124,17 +191,17 @@ tests:
       bar: baz
     nameOverride: foo
   asserts:
-  - isSubset:
+  - equal:
       path: metadata.labels
-      content:
+      value:
         app.kubernetes.io/name: foo
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/instance: ignition
         app.kubernetes.io/version: "8.3.0"
         helm.sh/chart: ignition-0.1.0
-  - isSubset:
+  - equal:
       path: spec.template.metadata.labels
-      content:
+      value:
         app.kubernetes.io/name: foo
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/instance: ignition
@@ -150,9 +217,9 @@ tests:
   release:
     name: ignition2
   asserts:
-  - isSubset:
+  - equal:
       path: spec.template.spec.affinity
-      content:
+      value:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
           - labelSelector:
@@ -193,9 +260,9 @@ tests:
               - '{{ .Release.Name }}'
           topologyKey: kubernetes.io/hostname
   asserts:
-  - isSubset:
+  - equal:
       path: spec.template.spec.affinity
-      content:
+      value:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
           - weight: 100
