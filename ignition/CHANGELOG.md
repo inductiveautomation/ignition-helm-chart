@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed YAML indent syntax error in certificate rotation jobs with custom Pod Security Context.
+- Fixed an issue where Gateway Network or Web TLS keystores would fail to copy into place on data volumes migrated from Ignition 8.1.x.
 
 ### Changed
 
