@@ -28,6 +28,7 @@ function populateWebKeystore() {
   info "Populating Web Server TLS Keystore -> ${keystore_path}"
 
   # Replace any existing TLS keystore with the updated one from the mounted secret
+  mkdir -v -p "${keystore_parent_path}"
   rm -v -f "${keystore_path}"
   cp -v "${WEB_TLS_SECRETS_DIR}/keystore.p12" "${keystore_path}"
 
