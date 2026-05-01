@@ -38,6 +38,7 @@ function populateGanKeystore() {
   info "Populating GAN Client Keystore -> ${keystore_path}"
 
   # Replace any existing GAN client keystore with the updated one from the mounted secret
+  mkdir -v -p "${keystore_parent_path}"
   rm -v -f "${keystore_path}"
   cp -v "${GAN_SECRETS_DIR}/keystore.p12" "${keystore_path}"
 
