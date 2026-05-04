@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Bumped _appVersion_ for Ignition to 8.3.4.
+- Bumped _appVersion_ for Ignition to 8.3.6.
 - New container-level security context defaults, see _Added_ section for more details.  Also refactored pod-level security context defaults to use a shared helper template.
 
 ### Added
