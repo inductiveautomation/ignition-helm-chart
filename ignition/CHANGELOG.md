@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-05-13
+
 ### Fixed
 
-- Restored previous defaults for `podSecurityContext`. OpenShift users can still apply the following to achieve compatibility with the _restriced_ SCC:
+- Restored previous defaults for `podSecurityContext`. OpenShift users can still apply the following to achieve compatibility with the _restricted_ Security Context Constraint (SCC) profile:
 
 ```
 podSecurityContext:
