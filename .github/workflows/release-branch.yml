@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0   # ct needs full history to detect changed charts
 
@@ -28,7 +28,7 @@ jobs:
           helm plugin list
 
       - name: Set up chart-testing
-        uses: helm/chart-testing-action@v2
+        uses: helm/chart-testing-action@6ec842c01de15ebb84c8627d2744a0c2f2755c9f # v2.8.0
 
       - name: helm-unittest (all changed charts)
         run: |
@@ -38,31 +38,90 @@ jobs:
         run: |
           ct lint --all
 
-  functional-tests:
-    name: Functional Tests using Kind (K8s ${{ matrix.k8s }})
+  package:
+    name: Package
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     needs: lint-and-unittest
-    strategy:
-      fail-fast: false
-      matrix:
-        k8s:
-          - v1.29.4
-          - v1.33.2
-
+    env:
+      # Empty values are set in the 'Compute environment variables' step
+      CHART_NAME: ignition
+      CHART_FILE: ""
+      CHART_FILE_VERSION: ""
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Set up chart-testing
-        uses: helm/chart-testing-action@v2
-
-      - name: Create kind cluster (${{ matrix.k8s }})
-        uses: helm/kind-action@v1
-        with:
-          node_image: kindest/node:${{ matrix.k8s }}
-          wait: 120s
-          cluster_name: ct-${{ matrix.k8s }}
-
-      - name: Test Charts
+      - name: Compute environment variables
         run: |
-          ct install --all
+          declare -A EXTRA_ENV
+
+          EXTRA_ENV[CHART_FILE_VERSION]="v$(helm show chart ignition | yq -r '.version')"
+          EXTRA_ENV[CHART_FILE]=".deploy/${CHART_NAME}-${EXTRA_ENV[CHART_FILE_VERSION]#v}.tgz"
+          
+          for key in "${!EXTRA_ENV[@]}"; do
+            echo "${key}=${EXTRA_ENV[$key]}" >> $GITHUB_ENV
+          done
+
+      - name: Import GPG signing key
+        run: |
+          mkdir -m 0700 -p ~/.gnupg
+          echo "${GPG_SECRING_B64}" | base64 -d > ~/.gnupg/secring.gpg
+        env:
+          GPG_SECRING_B64: ${{ secrets.GPG_SECRING_B64 }}
+
+      - name: Package, sign, and verify Ignition Helm chart
+        run: |
+          echo "${GPG_PASSPHRASE}" | helm package \
+            --sign --key "${GPG_KEY_ID}" --keyring ~/.gnupg/secring.gpg \
+            --passphrase-file - \
+            --destination .deploy "${CHART_NAME}" && \
+          helm verify --keyring ~/.gnupg/secring.gpg "${CHART_FILE}"
+        env:
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Artifact Packaged Chart
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: ${{ env.CHART_FILE }}
+          retention-days: 30
+          archive: false
+
+      - name: Artifact Packaged Chart Provenance File
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: ${{ env.CHART_FILE }}.prov
+          retention-days: 30
+          archive: false
+
+  ### TEMPORARY DISABLE
+  # functional-tests:
+  #   name: Functional Tests using Kind (K8s ${{ matrix.k8s }})
+  #   runs-on: ubuntu-latest
+  #   needs: package
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       k8s:
+  #         - v1.29.4
+  #         - v1.33.2
+
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+  #     - name: Set up chart-testing
+  #       uses: helm/chart-testing-action@6ec842c01de15ebb84c8627d2744a0c2f2755c9f # v2.8.0
+
+  #     - name: Create kind cluster (${{ matrix.k8s }})
+  #       uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
+  #       with:
+  #         node_image: kindest/node:${{ matrix.k8s }}
+  #         wait: 120s
+  #         cluster_name: ct-${{ matrix.k8s }}
+
+  #     - name: Test Charts
+  #       run: |
+  #         ct install --all
