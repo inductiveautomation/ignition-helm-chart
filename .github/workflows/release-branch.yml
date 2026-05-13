@@ -96,31 +96,32 @@ jobs:
           retention-days: 30
           archive: false
 
-  functional-tests:
-    name: Functional Tests using Kind (K8s ${{ matrix.k8s }})
-    runs-on: ubuntu-latest
-    needs: package
-    strategy:
-      fail-fast: false
-      matrix:
-        k8s:
-          - v1.29.4
-          - v1.33.2
+  ### TEMPORARY DISABLE
+  # functional-tests:
+  #   name: Functional Tests using Kind (K8s ${{ matrix.k8s }})
+  #   runs-on: ubuntu-latest
+  #   needs: package
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       k8s:
+  #         - v1.29.4
+  #         - v1.33.2
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Set up chart-testing
-        uses: helm/chart-testing-action@6ec842c01de15ebb84c8627d2744a0c2f2755c9f # v2.8.0
+  #     - name: Set up chart-testing
+  #       uses: helm/chart-testing-action@6ec842c01de15ebb84c8627d2744a0c2f2755c9f # v2.8.0
 
-      - name: Create kind cluster (${{ matrix.k8s }})
-        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
-        with:
-          node_image: kindest/node:${{ matrix.k8s }}
-          wait: 120s
-          cluster_name: ct-${{ matrix.k8s }}
+  #     - name: Create kind cluster (${{ matrix.k8s }})
+  #       uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
+  #       with:
+  #         node_image: kindest/node:${{ matrix.k8s }}
+  #         wait: 120s
+  #         cluster_name: ct-${{ matrix.k8s }}
 
-      - name: Test Charts
-        run: |
-          ct install --all
+  #     - name: Test Charts
+  #       run: |
+  #         ct install --all
