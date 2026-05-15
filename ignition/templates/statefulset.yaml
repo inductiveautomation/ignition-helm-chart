@@ -203,7 +203,7 @@ spec:
         {{- if (.Values.gateway.tls.enabled) }}
         - /config/scripts/prepare-tls-certificates.sh
         {{- end }}
-        {{- with (include "ignition.gateway.licensing.redundancyPrepareSh" .) }}
+        {{- with (include "ignition.gateway.redundancy.prepareSh" .) }}
         - {{ . }}
         {{- end }}
         {{- with .Values.gateway.preconfigure.additionalCmds }}
@@ -299,28 +299,8 @@ spec:
                 path: "gateway-admin-password"
               {{- end }}
           {{- end }}
-          {{- with .Values.gateway.licensing.leasedActivation }}
-          {{- include "ignition.gateway.licensing.setDefaults" . }}
-          - secret:
-              name: {{ required "Must supply licensing Secret name" .secretName }}
-              items:
-              - key: {{ .licenseKeyKey }}
-                path: "ignition-license-key"
-              - key: {{ .activationTokenKey }}
-                path: "ignition-activation-token"
-          {{- end }}
-          {{- range $redundancyMode := (.Values.gateway.redundancy.enabled | ternary (list "primary" "backup") list) -}}
-          {{- with (get $.Values.gateway.licensing (printf "%sLeasedActivation" $redundancyMode)) }}
-          {{- include "ignition.gateway.licensing.setDefaults" . }}
-          - secret:
-              name: {{ required (printf "Must supply %s licensing Secret name" $redundancyMode) .secretName }}
-              items:
-              - key: {{ .licenseKeyKey }}
-                path: {{ printf "%s-ignition-license-key" $redundancyMode }}
-              - key: {{ .activationTokenKey }}
-                path: {{ printf "%s-ignition-activation-token" $redundancyMode }}
-          {{- end }}
-          {{- end }}
+          {{- include "ignition.gateway.licensing.leasedActivation.configCheck" . }}
+          {{- include "ignition.gateway.licensing.leasedActivation.projectedSecretSources" . | nindent 10 }}
       {{- if .Values.certManager.enabled }}
       - name: gan-issuer-tls
         secret:

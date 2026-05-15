@@ -98,6 +98,12 @@ Emit the array elements for Ignition JVM args.
     {{- $jvmArgs = append $jvmArgs (printf "%s=%v" "-XX:MaxDirectMemorySize" .) -}}
     {{- end }}
   {{- end -}}
+  {{- if eq "true" (include "ignition.gateway.licensing.leasedActivation.terminateSessionOnShutdown" .) -}}
+    {{- $terminateSessionSysProp := "-Dignition.license.leased-activation-terminate-sessions-on-shutdown=true" -}}
+    {{- if not (has $terminateSessionSysProp .Values.gateway.jvmArgs) -}}
+      {{- $jvmArgs = append $jvmArgs $terminateSessionSysProp -}}
+    {{- end -}}
+  {{- end -}}
   {{- with .Values.gateway.loggers -}}
   {{- $jvmArgs = append $jvmArgs (printf "%s=%s" "-Dlogback.configurationFile" "/config/files/logback.xml") -}}
   {{- end -}}
@@ -739,6 +745,126 @@ Emit custom Ingress TLS settings, if defined.
 {{- end }}
 
 {{/*
+Helper template to reject based on unsupported leased licensing values configuration
+*/}}
+{{- define "ignition.gateway.licensing.leasedActivation.configCheck" -}}
+  {{- $licensing := .Values.gateway.licensing -}}
+  {{- $failMessage := "" -}}
+
+  {{- $secretName := dig "leasedActivation" "secretName" nil $licensing }}
+  {{- $primarySecretName := dig "primaryLeasedActivation" "secretName" nil $licensing }}
+  {{- $backupSecretName := dig "backupLeasedActivation" "secretName" nil $licensing }}
+
+  {{- $shouldCheck := gt (add
+    (len (dig "leasedActivation" dict $licensing))
+    (len (dig "primaryLeasedActivation" dict $licensing))
+    (len (dig "backupLeasedActivation" dict $licensing))
+  ) 0 -}}
+
+  {{- /* Check for redundancy secret names */ -}}
+  {{- if and .Values.gateway.redundancy.enabled $shouldCheck -}}
+    {{- if and (eq nil $secretName) (or (eq nil $primarySecretName) (eq nil $backupSecretName)) }}
+      {{- $failMessage = "Must supply primary/backup or shared licensing Secret name" }}
+    {{- end }}
+  {{- end }}
+
+  {{- /* Check for standalone secret name */ -}}
+  {{- if and (not .Values.gateway.redundancy.enabled) $shouldCheck -}}
+    {{- if (eq nil $secretName) }}
+      {{- $failMessage = "Must supply licensing Secret name" }}
+    {{- end }}
+  {{- end }}
+
+  {{- /* Throw failure if message is defined */ -}}
+  {{- if ne $failMessage "" -}}
+    {{- fail $failMessage }}
+  {{- end }}
+{{- end }}
+
+{{/*
+Returns "true" if leased activation licensing should use a redundancy split configuration
+*/}}
+{{- define "ignition.gateway.licensing.leasedActivation.useRedundancySplit" -}}
+  {{- $licensing := .Values.gateway.licensing -}}
+  {{- $shouldRender := gt (add
+    (len (dig "leasedActivation" dict $licensing))
+    (len (dig "primaryLeasedActivation" dict $licensing))
+    (len (dig "backupLeasedActivation" dict $licensing))
+  ) 0 -}}
+
+  {{- printf "%t" (and $shouldRender .Values.gateway.redundancy.enabled) }}
+{{- end }}
+
+{{/*
+Returns "true" if leased activation sessions should be terminated during graceful shutdown
+*/}}
+{{- define "ignition.gateway.licensing.leasedActivation.terminateSessionOnShutdown" -}}
+  {{- $licensing := .Values.gateway.licensing -}}
+  {{- $terminate := dig "leasedActivation" "terminateSessionOnShutdown" false $licensing -}}
+  {{- printf "%t" $terminate }}
+{{- end }}
+
+{{/*
+Helper template to render projected secret sources for leased licensing configuration, use with indent
+*/}}
+{{- define "ignition.gateway.licensing.leasedActivation.projectedSecretSources" -}}
+  {{- $licensing := .Values.gateway.licensing -}}
+
+  {{- $secretName := dig "leasedActivation" "secretName" nil $licensing }}
+  {{- $primarySecretName := dig "primaryLeasedActivation" "secretName" nil $licensing }}
+  {{- $backupSecretName := dig "backupLeasedActivation" "secretName" nil $licensing }}
+  {{- $licenseKeyKey := dig "leasedActivation" "licenseKeyKey" nil $licensing }}
+  {{- $primaryLicenseKeyKey := dig "primaryLeasedActivation" "licenseKeyKey" nil $licensing }}
+  {{- $backupLicenseKeyKey := dig "backupLeasedActivation" "licenseKeyKey" nil $licensing }}
+  {{- $activationTokenKey := dig "leasedActivation" "activationTokenKey" nil $licensing }}
+  {{- $primaryActivationTokenKey := dig "primaryLeasedActivation" "activationTokenKey" nil $licensing }}
+  {{- $backupActivationTokenKey := dig "backupLeasedActivation" "activationTokenKey" nil $licensing }}
+
+  {{- $shouldRender := gt (add
+    (len (dig "leasedActivation" dict $licensing))
+    (len (dig "primaryLeasedActivation" dict $licensing))
+    (len (dig "backupLeasedActivation" dict $licensing))
+  ) 0 -}}
+
+  {{- $useRedundancySplit := eq "true" (include "ignition.gateway.licensing.leasedActivation.useRedundancySplit" .) -}}
+
+  {{- if $useRedundancySplit -}}
+    {{- $primarySecretName = coalesce $primarySecretName $secretName -}}
+    {{- $backupSecretName = coalesce $backupSecretName $secretName -}}
+    {{- $primaryLicenseKeyKey = coalesce $primaryLicenseKeyKey $licenseKeyKey "ignition-license-key" -}}
+    {{- $backupLicenseKeyKey = coalesce $backupLicenseKeyKey $licenseKeyKey "ignition-license-key" -}}
+    {{- $primaryActivationTokenKey = coalesce $primaryActivationTokenKey $activationTokenKey "ignition-activation-token" -}}
+    {{- $backupActivationTokenKey = coalesce $backupActivationTokenKey $activationTokenKey "ignition-activation-token" -}}
+- secret:
+    name: {{ $primarySecretName }}
+    items:
+    - key: {{ $primaryLicenseKeyKey }}
+      path: primary-ignition-license-key
+    - key: {{ $primaryActivationTokenKey }}
+      path: primary-ignition-activation-token
+    {{- if not (eq $primarySecretName $backupSecretName) }}
+- secret:
+    name: {{ $backupSecretName }}
+    items:
+    {{- end }}
+    - key: {{ $backupLicenseKeyKey }}
+      path: backup-ignition-license-key
+    - key: {{ $backupActivationTokenKey }}
+      path: backup-ignition-activation-token
+  {{- end }}
+
+  {{- if and (not $useRedundancySplit) $shouldRender -}}
+- secret:
+    name: {{ $secretName }}
+    items:
+    - key: {{ $licenseKeyKey | default "ignition-license-key" }}
+      path: ignition-license-key
+    - key: {{ $activationTokenKey | default "ignition-activation-token" }}
+      path: ignition-activation-token
+  {{- end }}
+{{- end }}
+
+{{/*
 Helper template to inject default key names for leased activation licensing.
 */}}
 {{- define "ignition.gateway.licensing.setDefaults" -}}
@@ -753,7 +879,7 @@ Helper template to inject default key names for leased activation licensing.
 {{/*
 Render an invocation of the prepare-redundancy.sh script, adding a flag for redundant licensing prep if applicable
 */}}
-{{- define "ignition.gateway.licensing.redundancyPrepareSh" -}}
+{{- define "ignition.gateway.redundancy.prepareSh" -}}
   {{- $args := list -}}
   {{- if (and .Values.gateway.redundancy .Values.gateway.redundancy.enabled) -}}
     {{- $args = append $args "/config/scripts/prepare-redundancy.sh" -}}
@@ -763,7 +889,7 @@ Render an invocation of the prepare-redundancy.sh script, adding a flag for redu
     {{- $args = append $args ((print (include "ignition.fullname" .) "-gateway-0." (include "ignition.fullname" .)) | quote) -}}
 
     {{/* Optional args */}}
-    {{- if (and (hasKey .Values.gateway.licensing "primaryLeasedActivation") (hasKey .Values.gateway.licensing "backupLeasedActivation")) -}}
+    {{- if (eq "true" (include "ignition.gateway.licensing.leasedActivation.useRedundancySplit" .)) -}}
       {{- $args = append $args "-l" -}}
     {{- end -}}
     {{- if eq "false" (coalesce (include "ignition.gateway.envValue" (list . "GATEWAY_NETWORK_REQUIRESSL")) "true") -}}
