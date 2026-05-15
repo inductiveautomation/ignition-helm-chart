@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `gateway.licensing.leasedActivation.terminateSessionOnShutdown` boolean to easily enable termination of leased activation license session on graceful shutdown. Defaults to base Ignition behavior of retaining the license session on-disk under the `data` volume.
+
 ## [0.2.3] - 2026-05-13
 
 ### Fixed
