@@ -70,6 +70,8 @@ gateway:
       # -- Specify the Secret key under which the activation token is stored
       # activationTokenKey: "ignition-activation-token"
       # -- Set to true to attempt online license session termination during graceful shutdown
+      # -- Note: Review `gateway.jvmArgs` to make sure you're not already directly applying the
+      # --   respective JVM argument there as it will take precedence over this setting.
       # terminateSessionOnShutdown: false
 
   # -- Ignition Redundancy Configuration
