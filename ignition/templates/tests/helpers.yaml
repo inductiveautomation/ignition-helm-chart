@@ -1,10 +1,10 @@
 {{/*
-This ConfigMap is only rendered for use with unittest plugin.
+This fake HelpersTester object is only rendered for use with unittest plugin.
 */}}
 {{- with .Values._testing }}
 ---
-apiVersion: v1
-kind: ConfigMap
+apiVersion: ignition.ia.io/v1alpha1
+kind: HelpersTester
 metadata:
   name: {{ template "ignition.fullname" $ }}-helpers-test
   labels:
@@ -13,6 +13,12 @@ metadata:
 data:
   commaDelimitedArray: {{ include "ignition.renderCommaDelimitedArray" .commaDelimitedArray | quote }}
   gateway.useMaxRAMPercentage: {{ include "ignition.gateway.useMaxRAMPercentage" $ }}
+  {{- with .memoryLimitToBytes }}
+  memoryLimitToBytes:
+    {{- range $val := . }}
+    - {{ include "ignition.memoryLimitToBytes" $val }}
+    {{- end }}
+  {{- end }}
   {{- with (include "ignition.gateway.jvmArgs" $) }}
   gateway.jvmArgs:
   {{- . | indent 2 }}

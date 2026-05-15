@@ -71,10 +71,96 @@ Produce fully-qualified image reference for Ignition.
 {{- end }}
 
 {{/*
+Fails rendering if the input is not a number of either:
+- a plain integer or decimal (e.g. 123, 123.4)
+- a number with scientific notation (e.g. 12e3, 1.2e3, 1.2e+03)
+*/}}
+{{- define "ignition.failIfNotNumber" -}}
+  {{- $input := . | toString | trim -}}
+  {{- $matches := (list 
+    "^[0-9]+(\\.[0-9]+)?$"
+    "^[0-9]+(\\.[0-9]+)?[eE][+-]?[0-9]+$"
+  ) -}}
+  {{- $isNumber := false -}}
+  {{- range $regex := $matches -}}
+    {{- if regexMatch $regex $input -}}
+      {{- $isNumber = true -}}
+      {{- break -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if not $isNumber -}}
+    {{- fail (printf "Invalid value (%s): must be a number" $input) -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Accepts a Kubernetes memory quantity value (e.g. Mi, Gi, etc) and emits the representative byte count
+*/}}
+{{- define "ignition.memoryLimitToBytes" -}}
+  {{- $input := . | toString | trim -}}
+  {{- $units := list
+    (dict "suffix" "Ei" "factor" 1152921504606846976.0)
+    (dict "suffix" "Pi" "factor" 1125899906842624.0)
+    (dict "suffix" "Ti" "factor" 1099511627776.0)
+    (dict "suffix" "Gi" "factor" 1073741824.0)
+    (dict "suffix" "Mi" "factor" 1048576.0)
+    (dict "suffix" "Ki" "factor" 1024.0)
+    (dict "suffix" "E" "factor" 1e18)
+    (dict "suffix" "P" "factor" 1e15)
+    (dict "suffix" "T" "factor" 1e12)
+    (dict "suffix" "G" "factor" 1e9)
+    (dict "suffix" "M" "factor" 1e6)
+    (dict "suffix" "k" "factor" 1e3)
+  -}}
+  {{- $matched := false -}}
+
+  {{- /* Suffixed units: e.g. 1536Mi, 1.5Gi */ -}}
+  {{- range $unit := $units -}}
+    {{- $suffix := get $unit "suffix" -}}
+    {{- if and (not $matched) (hasSuffix $suffix $input) -}}
+      {{- $n := $input | trimSuffix $suffix -}}
+      {{- include "ignition.failIfNotNumber" $n -}}
+      {{- mulf ($n | float64) (get $unit "factor") | int64 | toString -}}
+      {{- $matched = true -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- if not $matched -}}
+    {{- /* Milli-bytes: e.g. 1500m */ -}}
+    {{- if hasSuffix "m" $input -}}
+      {{- $n := $input | trimSuffix "m" -}}
+      {{- include "ignition.failIfNotNumber" $n -}}
+      {{- divf ($n | float64) 1000.0 | ceil | int64 | toString -}}
+
+    {{- /* Scientific notation */ -}}
+    {{- else if contains "e" $input -}}
+      {{- include "ignition.failIfNotNumber" $input -}}
+      {{- $input | float64 | int64 | toString -}}
+
+    {{- /* Plain integer or decimal */ -}}
+    {{- else -}}
+      {{- if not (regexMatch "^[0-9]+(\\.[0-9]+)?$" $input) -}}
+        {{- fail "Invalid value for memory limit: must be a valid memory quantity" -}}
+      {{- end -}}
+      {{- $input | float64 | int64 | toString -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
 Returns "true" if .Values.gateway.maxRAMPercentage should be used
 */}}
 {{- define "ignition.gateway.useMaxRAMPercentage" -}}
-  {{- $maxRAMValueValid := (gt (.Values.gateway.maxRAMPercentage | int) 0) -}}
+  {{- $maxRAMValueValid := false -}}
+  {{- if (kindIs "string" .Values.gateway.maxRAMPercentage) -}}
+    {{- if (eq .Values.gateway.maxRAMPercentage "auto") -}}
+      {{- $maxRAMValueValid = true -}}
+    {{- else -}}
+      {{- fail "Invalid value for gateway.maxRAMPercentage: must be 'auto' or a number" -}}
+    {{- end -}}
+  {{- else -}}
+    {{- $maxRAMValueValid = (gt (.Values.gateway.maxRAMPercentage | int) 0) -}}
+  {{- end -}}
   {{- $resourcedEnabled := .Values.gateway.resourcesEnabled -}}
   {{/* Bring the computed resources into an object, defaulting to an empty dictionary */}}
   {{- $resources := fromYaml (include "ignition.gateway.resources" .) | default dict -}}
@@ -84,14 +170,64 @@ Returns "true" if .Values.gateway.maxRAMPercentage should be used
 {{- end }}
 
 {{/*
+Emits a numeric value for the max RAM percentage for JVM heap; if set to "auto", will dynamically compute a
+value based on the applied memory resource limits.
+Assumes that "ignition.gateway.useMaxRAMPercentage" has already been checked.
+*/}}
+{{- define "ignition.gateway.maxRAMPercentage" -}}
+  {{- $maxRAMPercentage := .Values.gateway.maxRAMPercentage | default "auto" -}}
+
+  {{- /* Normalize to a string to unblock comparison */ -}}
+  {{- $maxRAMPercentage := $maxRAMPercentage | toString -}}
+  {{- if (eq $maxRAMPercentage "auto") -}}
+    {{- $resources := fromYaml (include "ignition.gateway.resources" .) | default dict -}}
+    {{- $memoryLimitBytes := (include "ignition.memoryLimitToBytes" (dig "resources" "limits" "memory" "1536Mi" $resources)) | int64 -}}
+    {{- if (le $memoryLimitBytes 4294967296) -}}
+      {{- $maxRAMPercentage = 50 -}}
+    {{- else if (le $memoryLimitBytes 6442450944) -}}
+      {{- $maxRAMPercentage = 60 -}}
+    {{- else if (le $memoryLimitBytes 8589934592) -}}
+      {{- $maxRAMPercentage = 70 -}}
+    {{- else if (le $memoryLimitBytes 17179869184) -}}
+      {{- $maxRAMPercentage = 80 -}}
+    {{- else -}}
+      {{- $maxRAMPercentage = 85 -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- printf "%v" $maxRAMPercentage }}
+{{- end }}
+
+{{/*
+Emits a numeric value for the initial RAM percentage for JVM heap.  Defaults to the same value as max RAM percentage.
+Assumes that "ignition.gateway.useMaxRAMPercentage" has already been checked.
+*/}}
+{{- define "ignition.gateway.initialRAMPercentage" -}}
+  {{- $maxRAMPercentage := (include "ignition.gateway.maxRAMPercentage" .) -}}
+  {{- $initialRAMPercentage := .Values.gateway.initialRAMPercentage | default "auto" -}}
+
+  {{- if (kindIs "string" $initialRAMPercentage) -}}
+    {{- if (eq $initialRAMPercentage "auto") -}}
+      {{- $initialRAMPercentage = $maxRAMPercentage -}}
+    {{- else -}}
+      {{- fail "Invalid value for gateway.initialRAMPercentage: must be 'auto' or a number" -}}
+    {{- end -}}
+  {{- else -}}
+    {{- $initialRAMPercentage = (min $initialRAMPercentage $maxRAMPercentage) -}}
+  {{- end -}}
+
+  {{- printf "%v" $initialRAMPercentage }}
+{{- end }}
+
+{{/*
 Emit the array elements for Ignition JVM args.
 */}}
 {{- define "ignition.gateway.jvmArgs" -}}
   {{- /* Default JVM Args */ -}}
   {{- $jvmArgs := list }}
   {{- if eq "true" (include "ignition.gateway.useMaxRAMPercentage" .) -}}
-    {{- $maxRAMPercentage := (.Values.gateway.maxRAMPercentage | default 50 | int) -}}
-    {{- $initialRAMPercentage := (.Values.gateway.initialRAMPercentage | default $maxRAMPercentage) -}}
+    {{- $maxRAMPercentage := ((include "ignition.gateway.maxRAMPercentage" .) | int) -}}
+    {{- $initialRAMPercentage := ((include "ignition.gateway.initialRAMPercentage" .) | int) -}}
     {{- $jvmArgs = append $jvmArgs (printf "%s=%v" "-XX:InitialRAMPercentage" $initialRAMPercentage) -}}
     {{- $jvmArgs = append $jvmArgs (printf "%s=%v" "-XX:MaxRAMPercentage" $maxRAMPercentage) -}}
     {{- with .Values.gateway.maxDirectMemorySize }}
