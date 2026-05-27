@@ -9,6 +9,7 @@ chart:
   appVersion: 8.1.48
 set:
   _testing.enabled: true
+  _testing.failIfNotNumber: "0"
 tests:
 # ignition.fullname
 - it: evaluate fullname
@@ -31,7 +32,7 @@ tests:
       path: metadata.name
       value: foo-helpers-test
 # ignition.gateway.useMaxRAMPercentage
-- it: evaluate gateway.useMaxRAMPercentage
+- it: evaluate gateway.maxRAMPercentage defaults
   asserts:
   - equal:
       path: data["gateway.useMaxRAMPercentage"]
@@ -48,32 +49,401 @@ tests:
   - contains:
       path: data["gateway.wrapperArgs"]
       content: wrapper.java.maxmemory=0
-- it: evaluate gateway.useMaxRAMPercentage with resources disabled
+- it: evaluate gateway.maxRAMPercentage with resources disabled
   set:
     gateway.resourcesEnabled: false
   asserts:
   - equal:
       path: data["gateway.useMaxRAMPercentage"]
       value: false
-  - notContains:
+  - notExists:
       path: data["gateway.jvmArgs"]
-      content: -XX:InitialRAMPercentage=75
-  - notContains:
-      path: data["gateway.jvmArgs"]
-      content: -XX:MaxRAMPercentage=75
-  - notContains:
+  - notExists:
       path: data["gateway.wrapperArgs"]
-      content: wrapper.java.initmemory=0
-  - notContains:
-      path: data["gateway.wrapperArgs"]
-      content: wrapper.java.maxmemory=0
-- it: evaluate gateway.useMaxRAMPercentage with 0 value
+- it: evaluate gateway.maxRAMPercentage with 0 value
   set:
     gateway.maxRAMPercentage: 0
   asserts:
   - equal:
       path: data["gateway.useMaxRAMPercentage"]
       value: false
+- it: evaluate gateway.maxRAMPercentage with null value
+  set:
+    gateway.maxRAMPercentage: null
+  asserts:
+  - equal:
+      path: data["gateway.useMaxRAMPercentage"]
+      value: false
+- it: evaluate gateway.maxRAMPercentage with 0 value and initial set to some value (ignored)
+  set:
+    gateway.maxRAMPercentage: 0
+    gateway.initialRAMPercentage: 25
+  asserts:
+  - equal:
+      path: data["gateway.useMaxRAMPercentage"]
+      value: false
+- it: evaluate gateway.maxRAMPercentage with "auto" value
+  set:
+    # auto mode, assuming default limits of 1536Mi
+    gateway.maxRAMPercentage: "auto"
+  asserts:
+  - equal:
+      path: data["gateway.useMaxRAMPercentage"]
+      value: true
+  - lengthEqual:
+      path: data["gateway.jvmArgs"]
+      count: 2
+  - lengthEqual:
+      path: data["gateway.wrapperArgs"]
+      count: 2
+  - contains:
+      path: data["gateway.jvmArgs"]
+      content: -XX:InitialRAMPercentage=50
+  - contains:
+      path: data["gateway.jvmArgs"]
+      content: -XX:MaxRAMPercentage=50
+  - contains:
+      path: data["gateway.wrapperArgs"]
+      content: wrapper.java.initmemory=0
+  - contains:
+      path: data["gateway.wrapperArgs"]
+      content: wrapper.java.maxmemory=0
+- it: evaluate gateway.maxRAMPercentage with "auto" value and initial RAM % override
+  set:
+    # auto mode, assuming default limits of 1536Mi
+    gateway.maxRAMPercentage: "auto"
+    gateway.initialRAMPercentage: "auto"
+  asserts:
+  - equal:
+      path: data["gateway.useMaxRAMPercentage"]
+      value: true
+  - lengthEqual:
+      path: data["gateway.jvmArgs"]
+      count: 2
+  - contains:
+      path: data["gateway.jvmArgs"]
+      content: -XX:InitialRAMPercentage=50
+- it: evaluate gateway.maxRAMPercentage in "auto" with <= 4 GiB memory limit
+  set:
+    gateway.maxRAMPercentage: "auto"
+    gateway.resources.limits.memory: "4Gi"
+  asserts:
+  - contains:
+      path: data["gateway.jvmArgs"]
+      content: -XX:MaxRAMPercentage=50
+- it: evaluate gateway.maxRAMPercentage in "auto" with > 4096 MiB memory limit
+  set:
+    gateway.maxRAMPercentage: "auto"
+    gateway.resources.limits.memory: "4097Mi"
+  asserts:
+  - contains:
+      path: data["gateway.jvmArgs"]
+      content: -XX:MaxRAMPercentage=60
+- it: evaluate gateway.maxRAMPercentage in "auto" with <= 6 GiB memory limit
+  set:
+    gateway.maxRAMPercentage: "auto"
+    gateway.resources.limits.memory: "6Gi"
+  asserts:
+  - contains:
+      path: data["gateway.jvmArgs"]
+      content: -XX:MaxRAMPercentage=60
+- it: evaluate gateway.maxRAMPercentage in "auto" with <= 8 GiB memory limit
+  set:
+    gateway.maxRAMPercentage: "auto"
+    gateway.resources.limits.memory: "8Gi"
+  asserts:
+  - contains:
+      path: data["gateway.jvmArgs"]
+      content: -XX:MaxRAMPercentage=70
+- it: evaluate gateway.maxRAMPercentage in "auto" with <= 16 GiB memory limit
+  set:
+    gateway.maxRAMPercentage: "auto"
+    gateway.resources.limits.memory: "16Gi"
+  asserts:
+  - contains:
+      path: data["gateway.jvmArgs"]
+      content: -XX:MaxRAMPercentage=80
+- it: evaluate gateway.maxRAMPercentage in "auto" with > 16 GiB memory limit
+  set:
+    gateway.maxRAMPercentage: "auto"
+    gateway.resources.limits.memory: "16385Mi"
+  asserts:
+  - contains:
+      path: data["gateway.jvmArgs"]
+      content: -XX:MaxRAMPercentage=85
+- it: evaluate gateway.maxRAMPercentage with "auto" value and initial RAM % override set to specific percentage
+  set:
+    # auto mode, assuming default limits of 1536Mi
+    gateway.maxRAMPercentage: "auto"
+    gateway.initialRAMPercentage: 25
+  asserts:
+  - equal:
+      path: data["gateway.useMaxRAMPercentage"]
+      value: true
+  - lengthEqual:
+      path: data["gateway.jvmArgs"]
+      count: 2
+  - contains:
+      path: data["gateway.jvmArgs"]
+      content: -XX:InitialRAMPercentage=25
+- it: evaluate gateway.initialRAMPercentage setting alone
+  set:
+    gateway.initialRAMPercentage: 25
+  asserts:
+  - equal:
+      path: data["gateway.useMaxRAMPercentage"]
+      value: true
+  - lengthEqual:
+      path: data["gateway.jvmArgs"]
+      count: 2
+  - contains:
+      path: data["gateway.jvmArgs"]
+      content: -XX:InitialRAMPercentage=25
+- it: check initial RAM percentage limited to max RAM percentage (auto mode)
+  set:
+    gateway.maxRAMPercentage: "auto"
+    gateway.initialRAMPercentage: 75
+    gateway.resources.limits.memory: "6Gi"
+  asserts:
+  - equal:
+      path: data["gateway.useMaxRAMPercentage"]
+      value: true
+  - lengthEqual:
+      path: data["gateway.jvmArgs"]
+      count: 2
+  - contains:
+      path: data["gateway.jvmArgs"]
+      content: -XX:InitialRAMPercentage=60
+- it: check gateway.maxRAMPercentage over 100
+  set:
+    gateway.maxRAMPercentage: 150
+  asserts:
+  - contains:
+      path: data["gateway.jvmArgs"]
+      content: -XX:InitialRAMPercentage=100
+- it: check gateway.maxRAMPercentage negative value
+  set:
+    gateway.maxRAMPercentage: -1
+    gateway.resourcesEnabled: false
+  asserts:
+  - equal:
+      path: data["gateway.useMaxRAMPercentage"]
+      value: false
+  - notExists :
+      path: data["gateway.jvmArgs"]
+  - notExists:
+      path: data["gateway.wrapperArgs"]
+- it: check gateway.maxRAMPercentage of auto with resources disabled
+  set:
+    gateway.maxRAMPercentage: "auto"
+    gateway.resourcesEnabled: false
+  asserts:
+  - equal:
+      path: data["gateway.useMaxRAMPercentage"]
+      value: false
+  - notExists :
+      path: data["gateway.jvmArgs"]
+  - notExists:
+      path: data["gateway.wrapperArgs"]
+- it: check gateway.maxRAMPercentage of auto with resources set but no memory limit
+  set:
+    gateway.maxRAMPercentage: 75
+    gateway.resources:
+      limits:
+        cpu: 4000m
+      requests:
+        cpu: 4000m
+  asserts:
+  - equal:
+      path: data["gateway.useMaxRAMPercentage"]
+      value: false
+  - notExists :
+      path: data["gateway.jvmArgs"]
+  - notExists:
+      path: data["gateway.wrapperArgs"]
+- it: check initial RAM percentage limited to max RAM percentage
+  set:
+    gateway.maxRAMPercentage: 45
+    gateway.initialRAMPercentage: 55
+  asserts:
+  - equal:
+      path: data["gateway.useMaxRAMPercentage"]
+      value: true
+  - lengthEqual:
+      path: data["gateway.jvmArgs"]
+      count: 2
+  - contains:
+      path: data["gateway.jvmArgs"]
+      content: -XX:InitialRAMPercentage=45
+  - contains:
+      path: data["gateway.jvmArgs"]
+      content: -XX:MaxRAMPercentage=45
+- it: check for bad max RAM percentage value
+  set:
+    gateway.maxRAMPercentage: "not-a-number"
+  asserts:
+  - failedTemplate:
+      errorPattern: "^Invalid value for gateway.maxRAMPercentage:.*"
+- it: check for bad initial RAM percentage value
+  set:
+    gateway.initialRAMPercentage: "also-not-a-number"
+  asserts:
+  - failedTemplate:
+      errorPattern: "^Invalid value for gateway.initialRAMPercentage:.*"
+# ignition.failIfNotNumber
+- it: evaluate failIfNotNumber with valid integer
+  set:
+    _testing.failIfNotNumber: 123
+  asserts:
+  - notFailedTemplate: {}
+- it: evaluate failIfNotNumber with valid integer string
+  set:
+    _testing.failIfNotNumber: "123"
+  asserts:
+  - notFailedTemplate: {}
+- it: evaluate failIfNotNumber with valid float
+  set:
+    _testing.failIfNotNumber: 123.456
+  asserts:
+  - notFailedTemplate: {}
+- it: evaluate failIfNotNumber with valid float string
+  set:
+    _testing.failIfNotNumber: "123.456"
+  asserts:
+  - notFailedTemplate: {}
+- it: evaluate failIfNotNumber with valid scientific notation
+  set:
+    _testing.failIfNotNumber: 1.23e4
+  asserts:
+  - notFailedTemplate: {}
+- it: evaluate failIfNotNumber with valid scientific notation string
+  set:
+    _testing.failIfNotNumber: "1.23E+04"
+  asserts:
+  - notFailedTemplate: {}
+- it: evaluate failIfNotNumber with invalid number
+  set:
+    _testing.failIfNotNumber: "not-a-number"
+  asserts:
+  - failedTemplate:
+      errorPattern: "^Invalid value \\(.*"
+- it: evaluate failIfNotNumber with empty string
+  set:
+    _testing.failIfNotNumber: ""
+  asserts:
+  - failedTemplate:
+      errorPattern: "^Invalid value \\(.*"
+- it: evaluate failIfNotNumber with null value
+  set:
+    _testing.failIfNotNumber: null
+  asserts:
+  - failedTemplate:
+      errorPattern: "^Invalid value \\(.*"
+# ignition.memoryLimitToBytes
+- it: evaluate memoryLimitToBytes for base-2
+  set:
+    _testing.memoryLimitToBytes:
+    - 1610612736
+    - "1572864Ki"
+    - "1536Mi"
+    - "1.5Gi"
+    - "0.25Ti"
+    - "0.25Pi"
+    - "0.25Ei"
+  asserts:
+  - lengthEqual:
+      path: data["memoryLimitToBytes"]
+      count: 7
+  - equal:
+      path: data["memoryLimitToBytes"][0]
+      value: 1610612736
+  - equal:
+      path: data["memoryLimitToBytes"][1]
+      value: 1610612736
+  - equal:
+      path: data["memoryLimitToBytes"][2]
+      value: 1610612736
+  - equal:
+      path: data["memoryLimitToBytes"][3]
+      value: 1610612736
+  - equal:
+      path: data["memoryLimitToBytes"][4]
+      value: 274877906944
+  - equal:
+      path: data["memoryLimitToBytes"][5]
+      value: 281474976710656
+  - equal:
+      path: data["memoryLimitToBytes"][6]
+      value: 288230376151711744
+- it: evaluate memoryLimitToBytes for base-10
+  set:
+    _testing.memoryLimitToBytes:
+    - "1000"
+    - "1e3"
+    - "500M"
+    - "1.5G"
+    - "0.25T"
+    - "0.25P"
+    - "0.25E"
+  asserts:
+  - equal:
+      path: data["memoryLimitToBytes"][0]
+      value: 1000
+  - equal:
+      path: data["memoryLimitToBytes"][1]
+      value: 1000
+  - equal:
+      path: data["memoryLimitToBytes"][2]
+      value: 500000000
+  - equal:
+      path: data["memoryLimitToBytes"][3]
+      value: 1500000000
+  - equal:
+      path: data["memoryLimitToBytes"][4]
+      value: 250000000000
+  - equal:
+      path: data["memoryLimitToBytes"][5]
+      value: 250000000000000
+  - equal:
+      path: data["memoryLimitToBytes"][6]
+      value: 250000000000000000
+- it: evaluate memoryLimitToBytes misc
+  set:
+    _testing.memoryLimitToBytes:
+    - "1600m"
+    - "2.5e9"
+    - "2.5e+09"
+  asserts:
+  - equal:
+      path: data["memoryLimitToBytes"][0]
+      value: 2
+  - equal:
+      path: data["memoryLimitToBytes"][1]
+      value: 2500000000
+  - equal:
+      path: data["memoryLimitToBytes"][2]
+      value: 2500000000
+- it: evaluate memoryLimitToBytes with invalid value (0)
+  set:
+    _testing.memoryLimitToBytes:
+    - "not-a-number"
+  asserts:
+  - failedTemplate:
+      errorPattern: "^Invalid value .*"
+- it: evaluate memoryLimitToBytes with invalid value (1)
+  set:
+    _testing.memoryLimitToBytes:
+    - "123invalid"
+  asserts:
+  - failedTemplate:
+      errorPattern: "^Invalid value .*"
+- it: evaluate memoryLimitToBytes with invalid value (2)
+  set:
+    _testing.memoryLimitToBytes:
+    - "1.5.3Gi"
+  asserts:
+  - failedTemplate:
+      errorPattern: "^Invalid value .*"
 # ignition.ingress.useProxyForwardedHeader
 - it: evaluate ingress.useProxyForwardedHeader
   asserts:

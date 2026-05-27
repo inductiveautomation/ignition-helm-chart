@@ -101,6 +101,8 @@ gateway:
     timeoutSeconds: 3
 
   # -- Configure the JVM Heap Memory Percentage (based on memory limit of the container)
+  # Set to "auto" to use dynamic percentage (50% to 85%) based on memory resource limits (<=4Gi to >16Gi).
+  # Set to an integer value to use a fixed percentage, defaults to 75%.
   # Set to 0 to disable percentage based memory allocation.
   # Additionally define `initialRAMPercentage` to adjust initial heap size, defaults to match the max.
   maxRAMPercentage: 75
