@@ -5,12 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.4] - 2026-08-04
 
 ### Added
 
 - Added `gateway.licensing.leasedActivation.terminateSessionOnShutdown` boolean to easily enable termination of leased activation license session on graceful shutdown. Defaults to base Ignition behavior of retaining the license session on-disk under the `data` volume.
 - Added "auto" mode for `gateway.maxRAMPercentage` to allow for a dynamic percentage to be applied to the JVM heap size based on the memory resource limits set by `gateway.resources`.  This change is opt-in and will become the new default with the next major release of the Helm Chart.  For now, the default of `gateway.maxRAMPercentage=75` remains in place.
+
+### Changed
+
+- Bumped _appVersion_ for Ignition to 8.3.8.
 
 ## [0.2.3] - 2026-05-13
 
