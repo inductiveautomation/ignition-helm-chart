@@ -28,9 +28,7 @@ jobs:
           ls -la
 
       - name: Install helm-unittest plugin
-        run: |
-          helm plugin install https://github.com/helm-unittest/helm-unittest --version v1.0.3
-          helm plugin list
+        uses: ./.github/actions/setup-helm-unittest
 
       - name: helm-unittest (all changed charts)
         run: |

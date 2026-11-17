@@ -23,9 +23,7 @@ jobs:
           fetch-depth: 0   # ct needs full history to detect changed charts
 
       - name: Install helm-unittest plugin
-        run: |
-          helm plugin install https://github.com/helm-unittest/helm-unittest --version v1.0.3
-          helm plugin list
+        uses: ./.github/actions/setup-helm-unittest
 
       - name: Set up chart-testing
         uses: helm/chart-testing-action@720270857a28afd41e2426521a7801db09e9b510 # v2.9.0
