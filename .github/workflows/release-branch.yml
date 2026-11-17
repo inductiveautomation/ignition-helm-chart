@@ -18,17 +18,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0   # ct needs full history to detect changed charts
 
       - name: Install helm-unittest plugin
-        run: |
-          helm plugin install https://github.com/helm-unittest/helm-unittest --version v1.0.3
-          helm plugin list
+        uses: ./.github/actions/setup-helm-unittest
 
       - name: Set up chart-testing
-        uses: helm/chart-testing-action@6ec842c01de15ebb84c8627d2744a0c2f2755c9f # v2.8.0
+        uses: helm/chart-testing-action@720270857a28afd41e2426521a7801db09e9b510 # v2.9.0
 
       - name: helm-unittest (all changed charts)
         run: |
@@ -51,7 +49,7 @@ jobs:
       CHART_FILE_VERSION: ""
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Compute environment variables
         run: |
@@ -83,14 +81,14 @@ jobs:
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Artifact Packaged Chart
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           path: ${{ env.CHART_FILE }}
           retention-days: 30
           archive: false
 
       - name: Artifact Packaged Chart Provenance File
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           path: ${{ env.CHART_FILE }}.prov
           retention-days: 30
@@ -110,10 +108,10 @@ jobs:
 
   #   steps:
   #     - name: Checkout
-  #       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+  #       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
   #     - name: Set up chart-testing
-  #       uses: helm/chart-testing-action@6ec842c01de15ebb84c8627d2744a0c2f2755c9f # v2.8.0
+  #       uses: helm/chart-testing-action@720270857a28afd41e2426521a7801db09e9b510 # v2.9.0
 
   #     - name: Create kind cluster (${{ matrix.k8s }})
   #       uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0

@@ -1,0 +1,45 @@
+name: Set up helm-unittest
+description: Install the helm-unittest Helm plugin via OCI with GPG signature verification
+
+inputs:
+  version:
+    description: helm-unittest plugin version (without leading "v")
+    required: false
+    default: "1.2.1"
+  key-fingerprint:
+    description: |
+      Fingerprint of the helm-unittest plugin signing key (public-key.asc in the upstream repo)
+        gpg --show-keys --with-fingerprint public-key.asc
+    required: false
+    default: "853008CD0B0A5A2DA04FF8A5616AD47F65B54AC7"
+
+runs:
+  using: composite
+  steps:
+    - name: Install helm-unittest plugin
+      shell: bash
+      env:
+        HELM_UNITTEST_VERSION: ${{ inputs.version }}
+        HELM_UNITTEST_KEY_FPR: ${{ inputs.key-fingerprint }}
+      run: |
+        set -euo pipefail
+        helm version
+
+        # Use an isolated GPG home and import the plugin signing key from the release tag
+        export GNUPGHOME="$(mktemp -d)"
+        chmod 700 "${GNUPGHOME}"
+        curl -fsSL "https://raw.githubusercontent.com/helm-unittest/helm-unittest/v${HELM_UNITTEST_VERSION}/public-key.asc" \
+          | gpg --batch --import
+
+        # Fail closed unless the imported key matches the pinned fingerprint
+        gpg --batch --fingerprint "${HELM_UNITTEST_KEY_FPR}"
+
+        # Helm verifies against a legacy-format keyring
+        KEYRING="${RUNNER_TEMP}/helm-unittest-pubring.gpg"
+        gpg --batch --export "${HELM_UNITTEST_KEY_FPR}" > "${KEYRING}"
+
+        helm plugin install \
+          "oci://ghcr.io/helm-unittest/helm-unittest/unittest:${HELM_UNITTEST_VERSION}" \
+          --verify \
+          --keyring "${KEYRING}"
+        helm plugin list
